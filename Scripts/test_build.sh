@@ -1,27 +1,28 @@
 #!/bin/bash
 
-echo "Building Custom OS..."
+echo "Building TEST kernel..."
+
+if [ -d "../boot" ]; then
+    cd ..
+fi
 
 mkdir -p build
 
-echo "[1/5] Assembling bootloader..."
+echo "[1/4] Assembling bootloader..."
 nasm -f bin boot/boot.asm -o build/boot.bin
 
-echo "[2/5] Compiling kernel..."
+echo "[2/4] Compiling kernel..."
 gcc -m32 -ffreestanding -fno-pie -fno-PIC -c Kernel/kernel.c -o build/kernel.o
 
-echo "[3/5] Linking kernel..."
+echo "[3/4] Linking kernel..."
 ld -m elf_i386 -Ttext 0x1000 --oformat binary -e kernel_main build/kernel.o -o build/kernel.bin
 
-echo "[4/5] Creating disk image..."
-# Create a 1.44MB floppy image
+echo "[4/4] Creating disk image..."
 dd if=/dev/zero of=build/os.img bs=512 count=2880 2>/dev/null
-
-# Write bootloader to first sector
 dd if=build/boot.bin of=build/os.img bs=512 count=1 conv=notrunc 2>/dev/null
-
-# Write kernel starting at sector 2
 dd if=build/kernel.bin of=build/os.img bs=512 seek=1 conv=notrunc 2>/dev/null
 
-echo "[5/5] Build complete!"
-ls -lh build/os.img
+echo ""
+echo "Build complete!"
+ls -lh build/kernel.bin
+echo ""

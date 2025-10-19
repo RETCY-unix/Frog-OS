@@ -1,5 +1,5 @@
-[BITS 16]
-[ORG 0x7C00]
+BITS 16
+ORG 0x7C00
 
 start:
     xor ax, ax
@@ -13,8 +13,9 @@ start:
     mov si, msg_loading
     call print_string
 
+    ; Load MORE sectors - increase from 20 to 50
     mov ah, 0x02
-    mov al, 20
+    mov al, 50          ; Load 50 sectors (25KB)
     mov ch, 0
     mov cl, 2
     mov dh, 0
@@ -55,9 +56,9 @@ print_string:
     ret
 
 boot_drive db 0
-msg_loading db 'Loading...', 13, 10, 0
-msg_success db 'OK!', 13, 10, 0
-msg_error db 'ERROR!', 13, 10, 0
+msg_loading db 'Loading kernel...', 13, 10, 0
+msg_success db 'Jumping to kernel!', 13, 10, 0
+msg_error db 'DISK ERROR!', 13, 10, 0
 
 gdt_start:
     dd 0x0, 0x0
@@ -71,7 +72,7 @@ gdt_descriptor:
     dw gdt_end - gdt_start - 1
     dd gdt_start
 
-[BITS 32]
+BITS 32
 protected_mode:
     mov ax, 0x10
     mov ds, ax
@@ -81,7 +82,9 @@ protected_mode:
     mov ss, ax
     mov esp, 0x90000
     
-    jmp 0x1000
+    call 0x1000
+    
+    jmp $
 
 times 510-($-$$) db 0
 dw 0xAA55
