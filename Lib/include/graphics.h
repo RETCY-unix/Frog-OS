@@ -27,10 +27,18 @@ void graphics_fill_rect(int x, int y, int width, int height, unsigned int color)
 void graphics_draw_rect(int x, int y, int width, int height, unsigned int color);
 void graphics_draw_line(int x1, int y1, int x2, int y2, unsigned int color);
 void graphics_draw_circle(int cx, int cy, int radius, unsigned int color);
+void graphics_fill_circle(int cx, int cy, int radius, unsigned int color);
 
 // Text rendering (8x8 font)
 void graphics_draw_char(int x, int y, char c, unsigned int color);
 void graphics_draw_string(int x, int y, const char* str, unsigned int color);
+
+// Wallpaper functions
+void graphics_draw_gradient_wallpaper();
+void graphics_draw_abstract_wallpaper();
+void graphics_draw_wave_wallpaper();
+void graphics_draw_geometric_wallpaper();
+void graphics_draw_aurora_wallpaper();
 
 // RGB color helper
 #define RGB(r, g, b) (((r) << 16) | ((g) << 8) | (b))
@@ -59,5 +67,12 @@ void graphics_draw_string(int x, int y, const char* str, unsigned int color);
 #define COLOR_BROWN         0x8B4513
 #define COLOR_LIGHT_RED     0xFF6666
 #define COLOR_LIGHT_CYAN    0xE0FFFF
+
+// Modern UI colors
+#define COLOR_UI_BG         RGB(15, 20, 45)
+#define COLOR_UI_SURFACE    RGB(25, 35, 70)
+#define COLOR_UI_PRIMARY    RGB(60, 90, 180)
+#define COLOR_UI_ACCENT     RGB(100, 150, 255)
+#define COLOR_UI_TEXT       RGB(220, 230, 255)
 
 #endif

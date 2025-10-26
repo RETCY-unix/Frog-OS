@@ -3,12 +3,13 @@
 
 #define MAX_COMMAND_LENGTH 256
 #define LINE_HEIGHT 10
-#define MAX_LINES 60
+#define MAX_LINES 100
 
 // Command buffer
 static char command_buffer[MAX_COMMAND_LENGTH];
 static int cmd_index = 0;
 static int current_line = 0;
+static int current_wallpaper = 0; // 0=gradient, 1=abstract, 2=wave, 3=geometric, 4=aurora
 
 // String utilities
 int strcmp(const char* s1, const char* s2) {
@@ -34,32 +35,27 @@ int starts_with(const char* str, const char* prefix) {
     return 1;
 }
 
-// Draw wallpaper
+// Draw current wallpaper
 void draw_wallpaper() {
-    int width = graphics_get_width();
-    int height = graphics_get_height();
-    
-    // Simple gradient background
-    for (int y = 0; y < height; y++) {
-        unsigned char r = 10 + (y * 30) / height;
-        unsigned char g = 20 + (y * 50) / height;
-        unsigned char b = 80 + (y * 100) / height;
-        unsigned int color = RGB(r, g, b);
-        
-        for (int x = 0; x < width; x++) {
-            graphics_put_pixel(x, y, color);
-        }
+    switch (current_wallpaper) {
+        case 0:
+            graphics_draw_gradient_wallpaper();
+            break;
+        case 1:
+            graphics_draw_abstract_wallpaper();
+            break;
+        case 2:
+            graphics_draw_wave_wallpaper();
+            break;
+        case 3:
+            graphics_draw_geometric_wallpaper();
+            break;
+        case 4:
+            graphics_draw_aurora_wallpaper();
+            break;
+        default:
+            graphics_draw_gradient_wallpaper();
     }
-    
-    // Add decorative circles
-    graphics_draw_circle(100, 100, 40, RGB(60, 80, 150));
-    graphics_draw_circle(100, 100, 35, RGB(60, 80, 150));
-    
-    graphics_draw_circle(width - 100, 100, 50, RGB(80, 60, 150));
-    graphics_draw_circle(width - 100, 100, 45, RGB(80, 60, 150));
-    
-    graphics_draw_circle(width / 2, height - 100, 60, RGB(100, 70, 140));
-    graphics_draw_circle(width / 2, height - 100, 55, RGB(100, 70, 140));
 }
 
 // Draw terminal window
@@ -67,37 +63,42 @@ void draw_terminal_window() {
     int width = graphics_get_width();
     int height = graphics_get_height();
     
-    int term_x = 20;
-    int term_y = 20;
-    int term_width = width - 40;
-    int term_height = height - 40;
+    int term_x = 30;
+    int term_y = 30;
+    int term_width = width - 60;
+    int term_height = height - 60;
     
     // Window shadow
-    graphics_fill_rect(term_x + 3, term_y + 3, term_width, term_height, RGB(0, 0, 0));
+    graphics_fill_rect(term_x + 5, term_y + 5, term_width, term_height, RGB(0, 0, 0));
     
-    // Window background
-    graphics_fill_rect(term_x, term_y, term_width, term_height, RGB(20, 20, 30));
+    // Window background with transparency effect
+    graphics_fill_rect(term_x, term_y, term_width, term_height, RGB(20, 25, 40));
     
-    // Window border
-    graphics_draw_rect(term_x, term_y, term_width, term_height, RGB(100, 150, 200));
+    // Window border with gradient
+    graphics_draw_rect(term_x, term_y, term_width, term_height, RGB(80, 120, 200));
+    graphics_draw_rect(term_x + 1, term_y + 1, term_width - 2, term_height - 2, RGB(60, 100, 180));
     
-    // Title bar
-    graphics_fill_rect(term_x + 2, term_y + 2, term_width - 4, 16, RGB(50, 80, 120));
-    graphics_draw_string(term_x + 10, term_y + 5, "SEPPUKU OS Terminal v1.2", COLOR_WHITE);
+    // Title bar with gradient
+    for (int i = 0; i < 20; i++) {
+        unsigned char b = 120 - i * 2;
+        graphics_fill_rect(term_x + 2, term_y + 2 + i, term_width - 4, 1, RGB(40, 60, b));
+    }
     
-    // Window buttons
-    graphics_fill_rect(term_x + term_width - 14, term_y + 6, 8, 8, COLOR_RED);
-    graphics_fill_rect(term_x + term_width - 26, term_y + 6, 8, 8, COLOR_YELLOW);
-    graphics_fill_rect(term_x + term_width - 38, term_y + 6, 8, 8, COLOR_GREEN);
+    graphics_draw_string(term_x + 10, term_y + 7, "SEPPUKU OS Terminal v1.2 - 1080p Edition", COLOR_WHITE);
+    
+    // Window control buttons
+    graphics_fill_circle(term_x + term_width - 20, term_y + 12, 5, COLOR_RED);
+    graphics_fill_circle(term_x + term_width - 35, term_y + 12, 5, COLOR_YELLOW);
+    graphics_fill_circle(term_x + term_width - 50, term_y + 12, 5, COLOR_GREEN);
 }
 
 // Print text
 void shell_println(const char* text, unsigned int color) {
-    int term_x = 30;
-    int term_y = 50;
+    int term_x = 40;
+    int term_y = 60;
     
     if (current_line >= MAX_LINES) {
-        // Simple scroll: just reset
+        // Scroll
         current_line = MAX_LINES - 5;
         draw_wallpaper();
         draw_terminal_window();
@@ -109,12 +110,12 @@ void shell_println(const char* text, unsigned int color) {
 
 // Redraw prompt line
 void redraw_prompt() {
-    int term_x = 30;
-    int term_y = 50;
+    int term_x = 40;
+    int term_y = 60;
     int y = term_y + current_line * LINE_HEIGHT;
     
     // Clear prompt line
-    graphics_fill_rect(term_x, y, graphics_get_width() - 60, LINE_HEIGHT, RGB(20, 20, 30));
+    graphics_fill_rect(term_x, y, graphics_get_width() - 80, LINE_HEIGHT, RGB(20, 25, 40));
     
     // Draw prompt
     graphics_draw_string(term_x, y, "root@seppuku:~$ ", COLOR_LIGHT_GREEN);
@@ -124,7 +125,7 @@ void redraw_prompt() {
     
     // Draw cursor
     int cursor_x = term_x + 136 + (cmd_index * 8);
-    graphics_fill_rect(cursor_x, y, 8, 8, COLOR_WHITE);
+    graphics_fill_rect(cursor_x, y, 8, 8, RGB(100, 200, 255));
 }
 
 // Execute command
@@ -138,12 +139,14 @@ void shell_execute(const char* cmd) {
     // HELP
     if (strcmp(cmd, "help") == 0) {
         shell_println("Available commands:", COLOR_CYAN);
-        shell_println("  help    - Show this help", COLOR_WHITE);
-        shell_println("  clear   - Clear screen", COLOR_WHITE);
-        shell_println("  about   - About SEPPUKU OS", COLOR_WHITE);
-        shell_println("  colors  - Show color test", COLOR_WHITE);
-        shell_println("  echo <text> - Echo text", COLOR_WHITE);
-        shell_println("  reboot  - Reboot system", COLOR_WHITE);
+        shell_println("  help       - Show this help", COLOR_WHITE);
+        shell_println("  clear      - Clear screen", COLOR_WHITE);
+        shell_println("  about      - About SEPPUKU OS", COLOR_WHITE);
+        shell_println("  sysinfo    - System information", COLOR_WHITE);
+        shell_println("  colors     - Show color test", COLOR_WHITE);
+        shell_println("  wallpaper  - Change wallpaper", COLOR_WHITE);
+        shell_println("  echo <txt> - Echo text", COLOR_WHITE);
+        shell_println("  reboot     - Reboot system", COLOR_WHITE);
         return;
     }
     
@@ -157,32 +160,93 @@ void shell_execute(const char* cmd) {
     
     // ABOUT
     if (strcmp(cmd, "about") == 0) {
-        shell_println("SEPPUKU OS v1.2 - Graphical Edition", COLOR_LIGHT_RED);
-        shell_println("A minimalist x86 OS with VESA graphics", COLOR_WHITE);
+        shell_println("========================================", COLOR_LIGHT_CYAN);
+        shell_println("SEPPUKU OS v1.2 - 1080p Edition", COLOR_LIGHT_RED);
+        shell_println("========================================", COLOR_LIGHT_CYAN);
+        shell_println("A modern x86 OS with VESA graphics", COLOR_WHITE);
+        shell_println("Built from scratch in C and Assembly", COLOR_YELLOW);
+        shell_println("Features: Protected mode, IDT, KB, GFX", COLOR_GRAY);
+        shell_println("", COLOR_WHITE);
+        return;
+    }
+    
+    // SYSINFO
+    if (strcmp(cmd, "sysinfo") == 0) {
+        shell_println("System Information:", COLOR_CYAN);
         
         int w = graphics_get_width();
         int h = graphics_get_height();
-        if (w == 1024 && h == 768) {
-            shell_println("Resolution: 1024x768", COLOR_YELLOW);
+        
+        shell_println("  Resolution: ", COLOR_WHITE);
+        if (w == 1920 && h == 1080) {
+            shell_println("    1920x1080 (Full HD)", COLOR_GREEN);
         } else if (w == 1280 && h == 1024) {
-            shell_println("Resolution: 1280x1024", COLOR_YELLOW);
+            shell_println("    1280x1024 (SXGA)", COLOR_GREEN);
+        } else if (w == 1024 && h == 768) {
+            shell_println("    1024x768 (XGA)", COLOR_GREEN);
         } else {
-            shell_println("Resolution: Custom", COLOR_YELLOW);
+            shell_println("    Custom Resolution", COLOR_YELLOW);
         }
         
-        shell_println("Built from scratch in C and Assembly", COLOR_WHITE);
+        shell_println("  Graphics: VESA VBE 2.0+", COLOR_WHITE);
+        shell_println("  CPU Mode: 32-bit Protected", COLOR_WHITE);
+        shell_println("  Interrupts: Enabled (IDT)", COLOR_WHITE);
         return;
     }
     
     // COLORS
     if (strcmp(cmd, "colors") == 0) {
-        shell_println("Color test:", COLOR_WHITE);
-        shell_println("RED TEXT", COLOR_RED);
-        shell_println("GREEN TEXT", COLOR_GREEN);
-        shell_println("BLUE TEXT", COLOR_BLUE);
-        shell_println("YELLOW TEXT", COLOR_YELLOW);
-        shell_println("CYAN TEXT", COLOR_CYAN);
-        shell_println("MAGENTA TEXT", COLOR_MAGENTA);
+        shell_println("Color Palette Test:", COLOR_WHITE);
+        shell_println("RED - Primary Alert", COLOR_RED);
+        shell_println("GREEN - Success Status", COLOR_GREEN);
+        shell_println("BLUE - Information", COLOR_BLUE);
+        shell_println("YELLOW - Warning", COLOR_YELLOW);
+        shell_println("CYAN - Highlight", COLOR_CYAN);
+        shell_println("MAGENTA - Special", COLOR_MAGENTA);
+        shell_println("ORANGE - Notice", COLOR_ORANGE);
+        shell_println("PURPLE - Debug", COLOR_PURPLE);
+        return;
+    }
+    
+    // WALLPAPER
+    if (strcmp(cmd, "wallpaper") == 0) {
+        shell_println("Wallpaper Options:", COLOR_CYAN);
+        shell_println("  wallpaper gradient  - Smooth gradient", COLOR_WHITE);
+        shell_println("  wallpaper abstract  - Abstract circles", COLOR_WHITE);
+        shell_println("  wallpaper wave      - Wave pattern", COLOR_WHITE);
+        shell_println("  wallpaper geometric - Modern geometric", COLOR_WHITE);
+        shell_println("  wallpaper aurora    - Aurora lights", COLOR_WHITE);
+        return;
+    }
+    
+    if (starts_with(cmd, "wallpaper ")) {
+        const char* type = cmd + 10;
+        
+        if (strcmp(type, "gradient") == 0) {
+            current_wallpaper = 0;
+            shell_println("Wallpaper set to: Gradient", COLOR_GREEN);
+        } else if (strcmp(type, "abstract") == 0) {
+            current_wallpaper = 1;
+            shell_println("Wallpaper set to: Abstract", COLOR_GREEN);
+        } else if (strcmp(type, "wave") == 0) {
+            current_wallpaper = 2;
+            shell_println("Wallpaper set to: Wave", COLOR_GREEN);
+        } else if (strcmp(type, "geometric") == 0) {
+            current_wallpaper = 3;
+            shell_println("Wallpaper set to: Geometric", COLOR_GREEN);
+        } else if (strcmp(type, "aurora") == 0) {
+            current_wallpaper = 4;
+            shell_println("Wallpaper set to: Aurora", COLOR_GREEN);
+        } else {
+            shell_println("Unknown wallpaper. Type 'wallpaper' for options.", COLOR_RED);
+            return;
+        }
+        
+        // Redraw with new wallpaper
+        draw_wallpaper();
+        draw_terminal_window();
+        current_line = 0;
+        shell_println("Wallpaper changed!", COLOR_GREEN);
         return;
     }
     
@@ -194,7 +258,12 @@ void shell_execute(const char* cmd) {
     
     // REBOOT
     if (strcmp(cmd, "reboot") == 0) {
-        shell_println("Rebooting...", COLOR_YELLOW);
+        shell_println("Rebooting system...", COLOR_YELLOW);
+        
+        // Wait a moment
+        for (volatile int i = 0; i < 50000000; i++);
+        
+        // Keyboard controller reboot
         unsigned char temp;
         __asm__ __volatile__("inb %1, %0" : "=a"(temp) : "Nd"((unsigned short)0x64));
         while (temp & 0x02) {
@@ -206,7 +275,7 @@ void shell_execute(const char* cmd) {
     }
     
     // Unknown command
-    shell_println("Unknown command. Type 'help' for commands.", COLOR_LIGHT_RED);
+    shell_println("Unknown command. Type 'help' for available commands.", COLOR_LIGHT_RED);
 }
 
 // Handle keyboard input
@@ -234,12 +303,18 @@ void shell_handle_key(char c) {
 void shell_init() {
     cmd_index = 0;
     current_line = 0;
+    current_wallpaper = 3; // Start with geometric wallpaper
     
     draw_wallpaper();
     draw_terminal_window();
     
     shell_println("", COLOR_WHITE);
-    shell_println("Welcome to SEPPUKU OS - Graphical Edition!", COLOR_LIGHT_CYAN);
+    shell_println("Welcome to SEPPUKU OS - 1080p Edition!", COLOR_LIGHT_CYAN);
+    
+    int w = graphics_get_width();
+    int h = graphics_get_height();
+    shell_println("Display initialized successfully!", COLOR_GREEN);
+    
     shell_println("Type 'help' for available commands.", COLOR_LIGHT_GRAY);
     shell_println("", COLOR_WHITE);
     
