@@ -7,7 +7,19 @@ static unsigned short screen_height = 0;
 static unsigned short pitch = 0;
 static unsigned char bpp = 0;
 
-// Simple 8x8 font (ASCII 32-126)
+// Simple 8x8 font - using a simplified test font first
+static const unsigned char test_font_A[8] = {
+    0x18, // 00011000
+    0x3C, // 00111100
+    0x66, // 01100110
+    0x7E, // 01111110
+    0x66, // 01100110
+    0x66, // 01100110
+    0x66, // 01100110
+    0x00  // 00000000
+};
+
+// Original font array (keeping your existing font)
 static const unsigned char font8x8[95][8] = {
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // Space
     {0x18, 0x3C, 0x3C, 0x18, 0x18, 0x00, 0x18, 0x00}, // !
@@ -69,7 +81,7 @@ static const unsigned char font8x8[95][8] = {
     {0x33, 0x33, 0x33, 0x1E, 0x0C, 0x0C, 0x1E, 0x00}, // Y
     {0x7F, 0x63, 0x31, 0x18, 0x4C, 0x66, 0x7F, 0x00}, // Z
     {0x1E, 0x06, 0x06, 0x06, 0x06, 0x06, 0x1E, 0x00}, // [
-    {0x03, 0x06, 0x0C, 0x18, 0x30, 0x60, 0x40, 0x00}, // \
+    {0x03, 0x06, 0x0C, 0x18, 0x30, 0x60, 0x40, 0x00}, // backslash
     {0x1E, 0x18, 0x18, 0x18, 0x18, 0x18, 0x1E, 0x00}, // ]
     {0x08, 0x1C, 0x36, 0x63, 0x00, 0x00, 0x00, 0x00}, // ^
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF}, // _
@@ -106,9 +118,7 @@ static const unsigned char font8x8[95][8] = {
     {0x6E, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // ~
 };
 
-// Initialize graphics from bootloader info at 0x7E00
 void graphics_init() {
-    // Bootloader stores framebuffer info at 0x7E00
     framebuffer = (unsigned int*)(*(unsigned int*)0x7E00);
     screen_width = *(unsigned short*)0x7E04;
     screen_height = *(unsigned short*)0x7E06;
@@ -172,12 +182,10 @@ void graphics_fill_rect(int x, int y, int width, int height, unsigned int color)
 }
 
 void graphics_draw_rect(int x, int y, int width, int height, unsigned int color) {
-    // Top and bottom
     for (int dx = 0; dx < width; dx++) {
         graphics_put_pixel(x + dx, y, color);
         graphics_put_pixel(x + dx, y + height - 1, color);
     }
-    // Left and right
     for (int dy = 0; dy < height; dy++) {
         graphics_put_pixel(x, y + dy, color);
         graphics_put_pixel(x + width - 1, y + dy, color);
@@ -237,15 +245,20 @@ void graphics_draw_circle(int cx, int cy, int radius, unsigned int color) {
     }
 }
 
+// CORRECTED CHARACTER DRAWING FUNCTION
 void graphics_draw_char(int x, int y, char c, unsigned int color) {
     if (c < 32 || c > 126) return;
     
     const unsigned char* glyph = font8x8[c - 32];
     
-    for (int dy = 0; dy < 8; dy++) {
-        for (int dx = 0; dx < 8; dx++) {
-            if (glyph[dy] & (1 << dx)) {
-                graphics_put_pixel(x + dx, y + dy, color);
+    // Each byte represents one row (8 pixels)
+    // Bit 0 (LSB) = leftmost pixel, Bit 7 (MSB) = rightmost pixel
+    for (int row = 0; row < 8; row++) {
+        unsigned char byte = glyph[row];
+        for (int col = 0; col < 8; col++) {
+            // Check bit from right to left
+            if (byte & (1 << col)) {
+                graphics_put_pixel(x + col, y + row, color);
             }
         }
     }
