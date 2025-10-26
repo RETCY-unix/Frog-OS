@@ -11,6 +11,7 @@ if [ ! -f "build/os.img" ]; then
 fi
 
 echo "Starting SEPPUKU OS in 1080p mode..."
+echo "Press Ctrl+Alt+F to toggle fullscreen"
 echo "Press Ctrl+Alt+G to release mouse"
 echo "Press Ctrl+C to quit"
 echo ""
@@ -20,5 +21,5 @@ qemu-system-i386 \
     -boot a \
     -m 64M \
     -vga std \
-    -display sdl \
+    -display gtk,zoom-to-fit=on \
     -full-screen

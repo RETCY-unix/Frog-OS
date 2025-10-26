@@ -62,7 +62,7 @@ void kernel_main() {
     graphics_draw_string(100, y, ">>> BOOT SUCCESSFUL <<<", COLOR_LIGHT_GREEN);
     
     // Wait a moment
-    for (volatile int i = 0; i < 100000000; i++);
+    for (volatile int i = 0; i < 500000000; i++);
     
     // Start graphical shell
     shell_run();
