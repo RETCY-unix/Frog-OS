@@ -1,15 +1,20 @@
 #include "../../Lib/include/graphics.h"
 #include "../../Lib/include/keyboard.h"
+#include "../../Lib/include/fat12.h"
 
 #define MAX_COMMAND_LENGTH 256
 #define LINE_HEIGHT 10
 #define MAX_LINES 100
+#define MAX_FILE_SIZE 4096
 
 // Command buffer
 static char command_buffer[MAX_COMMAND_LENGTH];
 static int cmd_index = 0;
 static int current_line = 0;
-static int current_wallpaper = 0; // 0=gradient, 1=abstract, 2=wave, 3=geometric, 4=aurora
+static int current_wallpaper = 0;
+
+// File buffer
+static unsigned char file_buffer[MAX_FILE_SIZE];
 
 // String utilities
 int strcmp(const char* s1, const char* s2) {
@@ -33,6 +38,13 @@ int starts_with(const char* str, const char* prefix) {
         prefix++;
     }
     return 1;
+}
+
+void strcpy(char* dest, const char* src) {
+    while (*src) {
+        *dest++ = *src++;
+    }
+    *dest = '\0';
 }
 
 // Draw current wallpaper
@@ -59,7 +71,6 @@ void draw_wallpaper() {
 }
 
 // Draw terminal window
-// Draw terminal window
 void draw_terminal_window() {
     int width = graphics_get_width();
     int height = graphics_get_height();
@@ -85,14 +96,13 @@ void draw_terminal_window() {
         graphics_fill_rect(term_x + 2, term_y + 2 + i, term_width - 4, 1, RGB(gray, gray, gray));
     }
     
-    graphics_draw_string(term_x + 10, term_y + 7, "SEPPUKU OS Terminal v1.2 - 1080p Edition", COLOR_WHITE);
+    graphics_draw_string(term_x + 10, term_y + 7, "SEPPUKU OS Terminal v1.2 - File System Edition", COLOR_WHITE);
     
-    // Window control buttons - all grayscale
+    // Window control buttons
     graphics_fill_circle(term_x + term_width - 20, term_y + 12, 5, RGB(200, 200, 200));
     graphics_fill_circle(term_x + term_width - 35, term_y + 12, 5, RGB(150, 150, 150));
     graphics_fill_circle(term_x + term_width - 50, term_y + 12, 5, RGB(100, 100, 100));
 }
-
 
 // Print text
 void shell_println(const char* text, unsigned int color) {
@@ -100,7 +110,6 @@ void shell_println(const char* text, unsigned int color) {
     int term_y = 60;
     
     if (current_line >= MAX_LINES) {
-        // Scroll
         current_line = MAX_LINES - 5;
         draw_wallpaper();
         draw_terminal_window();
@@ -117,7 +126,7 @@ void redraw_prompt() {
     int y = term_y + current_line * LINE_HEIGHT;
     
     // Clear prompt line
-    graphics_fill_rect(term_x, y, graphics_get_width() - 80, LINE_HEIGHT, RGB(20, 25, 40));
+    graphics_fill_rect(term_x, y, graphics_get_width() - 80, LINE_HEIGHT, RGB(20, 20, 20));
     
     // Draw prompt
     graphics_draw_string(term_x, y, "root@seppuku:~$ ", COLOR_LIGHT_GREEN);
@@ -127,7 +136,42 @@ void redraw_prompt() {
     
     // Draw cursor
     int cursor_x = term_x + 136 + (cmd_index * 8);
-    graphics_fill_rect(cursor_x, y, 8, 8, RGB(100, 200, 255));
+    graphics_fill_rect(cursor_x, y, 8, 8, RGB(150, 150, 150));
+}
+
+// Convert int to string
+void int_to_str(int num, char* str) {
+    if (num == 0) {
+        str[0] = '0';
+        str[1] = '\0';
+        return;
+    }
+    
+    int i = 0;
+    int is_negative = 0;
+    
+    if (num < 0) {
+        is_negative = 1;
+        num = -num;
+    }
+    
+    while (num > 0) {
+        str[i++] = '0' + (num % 10);
+        num /= 10;
+    }
+    
+    if (is_negative) {
+        str[i++] = '-';
+    }
+    
+    str[i] = '\0';
+    
+    // Reverse
+    for (int j = 0; j < i / 2; j++) {
+        char temp = str[j];
+        str[j] = str[i - j - 1];
+        str[i - j - 1] = temp;
+    }
 }
 
 // Execute command
@@ -138,6 +182,159 @@ void shell_execute(const char* cmd) {
         return;
     }
     
+    // LS - List files
+    if (strcmp(cmd, "ls") == 0) {
+        fat12_entry_t entries[50];
+        int count = fat12_list_files(entries, 50);
+        
+        if (count == 0) {
+            shell_println("No files found.", COLOR_YELLOW);
+        } else {
+            shell_println("Files:", COLOR_CYAN);
+            
+            for (int i = 0; i < count; i++) {
+                char filename[13];
+                int j = 0;
+                
+                // Copy name
+                for (int k = 0; k < 8 && entries[i].filename[k] != ' '; k++) {
+                    filename[j++] = entries[i].filename[k];
+                }
+                
+                // Add dot if extension exists
+                if (entries[i].filename[8] != ' ') {
+                    filename[j++] = '.';
+                    for (int k = 8; k < 11 && entries[i].filename[k] != ' '; k++) {
+                        filename[j++] = entries[i].filename[k];
+                    }
+                }
+                
+                filename[j] = '\0';
+                
+                // Print filename and size
+                char line[64];
+                char size_str[16];
+                int_to_str(entries[i].file_size, size_str);
+                
+                strcpy(line, "  ");
+                int pos = 2;
+                for (int k = 0; filename[k]; k++) {
+                    line[pos++] = filename[k];
+                }
+                while (pos < 20) line[pos++] = ' ';
+                for (int k = 0; size_str[k]; k++) {
+                    line[pos++] = size_str[k];
+                }
+                line[pos++] = ' ';
+                line[pos++] = 'b';
+                line[pos++] = 'y';
+                line[pos++] = 't';
+                line[pos++] = 'e';
+                line[pos++] = 's';
+                line[pos] = '\0';
+                
+                shell_println(line, COLOR_WHITE);
+            }
+        }
+        return;
+    }
+    
+    // CAT - Read file
+    if (starts_with(cmd, "cat ")) {
+        const char* filename = cmd + 4;
+        
+        int size = fat12_read_file(filename, file_buffer, MAX_FILE_SIZE);
+        
+        if (size < 0) {
+            shell_println("Error: File not found", COLOR_RED);
+        } else {
+            // Print file contents
+            file_buffer[size] = '\0';
+            
+            char line[81];
+            int line_pos = 0;
+            
+            for (int i = 0; i < size; i++) {
+                if (file_buffer[i] == '\n' || line_pos >= 80) {
+                    line[line_pos] = '\0';
+                    shell_println(line, COLOR_WHITE);
+                    line_pos = 0;
+                } else if (file_buffer[i] >= 32 && file_buffer[i] < 127) {
+                    line[line_pos++] = file_buffer[i];
+                }
+            }
+            
+            if (line_pos > 0) {
+                line[line_pos] = '\0';
+                shell_println(line, COLOR_WHITE);
+            }
+        }
+        return;
+    }
+    
+    // ECHO > file - Write to file
+    if (starts_with(cmd, "echo ")) {
+        const char* rest = cmd + 5;
+        const char* arrow = rest;
+        
+        // Find " > "
+        while (*arrow && !(*arrow == ' ' && *(arrow+1) == '>' && *(arrow+2) == ' ')) {
+            arrow++;
+        }
+        
+        if (*arrow) {
+            // Extract text and filename
+            int text_len = arrow - rest;
+            const char* filename = arrow + 3;
+            
+            // Copy text
+            for (int i = 0; i < text_len && i < MAX_FILE_SIZE; i++) {
+                file_buffer[i] = rest[i];
+            }
+            
+            int result = fat12_write_file(filename, file_buffer, text_len);
+            
+            if (result < 0) {
+                shell_println("Error: Could not write file", COLOR_RED);
+            } else {
+                shell_println("File written successfully", COLOR_GREEN);
+            }
+        } else {
+            // Just echo
+            shell_println(rest, COLOR_YELLOW);
+        }
+        return;
+    }
+    
+    // RM - Delete file
+    if (starts_with(cmd, "rm ")) {
+        const char* filename = cmd + 3;
+        
+        if (fat12_delete_file(filename) == 0) {
+            shell_println("File deleted", COLOR_GREEN);
+        } else {
+            shell_println("Error: File not found", COLOR_RED);
+        }
+        return;
+    }
+    
+    // TOUCH - Create empty file
+    if (starts_with(cmd, "touch ")) {
+        const char* filename = cmd + 6;
+        
+        if (fat12_file_exists(filename)) {
+            shell_println("File already exists", COLOR_YELLOW);
+        } else {
+            file_buffer[0] = '\0';
+            if (fat12_write_file(filename, file_buffer, 0) >= 0) {
+                shell_println("File created", COLOR_GREEN);
+            } else {
+                shell_println("Error: Could not create file", COLOR_RED);
+            }
+        }
+        return;
+    }
+    
     // HELP
     if (strcmp(cmd, "help") == 0) {
         shell_println("Available commands:", COLOR_CYAN);
@@ -145,9 +342,13 @@ void shell_execute(const char* cmd) {
         shell_println("  clear      - Clear screen", COLOR_WHITE);
         shell_println("  about      - About SEPPUKU OS", COLOR_WHITE);
         shell_println("  sysinfo    - System information", COLOR_WHITE);
-        shell_println("  colors     - Show color test", COLOR_WHITE);
-        shell_println("  wallpaper  - Change wallpaper", COLOR_WHITE);
+        shell_println("  ls         - List files", COLOR_WHITE);
+        shell_println("  cat <file> - Read file", COLOR_WHITE);
         shell_println("  echo <txt> - Echo text", COLOR_WHITE);
+        shell_println("  echo <txt> > <file> - Write to file", COLOR_WHITE);
+        shell_println("  rm <file>  - Delete file", COLOR_WHITE);
+        shell_println("  touch <file> - Create empty file", COLOR_WHITE);
+        shell_println("  wallpaper  - Change wallpaper", COLOR_WHITE);
         shell_println("  reboot     - Reboot system", COLOR_WHITE);
         return;
     }
@@ -163,11 +364,12 @@ void shell_execute(const char* cmd) {
     // ABOUT
     if (strcmp(cmd, "about") == 0) {
         shell_println("========================================", COLOR_LIGHT_CYAN);
-        shell_println("SEPPUKU OS v1.2 - 1080p Edition", COLOR_LIGHT_RED);
+        shell_println("SEPPUKU OS v1.2 - File System Edition", COLOR_LIGHT_RED);
         shell_println("========================================", COLOR_LIGHT_CYAN);
-        shell_println("A modern x86 OS with VESA graphics", COLOR_WHITE);
+        shell_println("A modern x86 OS with FAT12 filesystem", COLOR_WHITE);
         shell_println("Built from scratch in C and Assembly", COLOR_YELLOW);
-        shell_println("Features: Protected mode, IDT, KB, GFX", COLOR_GRAY);
+        shell_println("Features: Protected mode, IDT, KB,", COLOR_GRAY);
+        shell_println("          Graphics, ATA disk, FAT12", COLOR_GRAY);
         shell_println("", COLOR_WHITE);
         return;
     }
@@ -186,27 +388,13 @@ void shell_execute(const char* cmd) {
             shell_println("    1280x1024 (SXGA)", COLOR_GREEN);
         } else if (w == 1024 && h == 768) {
             shell_println("    1024x768 (XGA)", COLOR_GREEN);
-        } else {
-            shell_println("    Custom Resolution", COLOR_YELLOW);
         }
         
         shell_println("  Graphics: VESA VBE 2.0+", COLOR_WHITE);
         shell_println("  CPU Mode: 32-bit Protected", COLOR_WHITE);
         shell_println("  Interrupts: Enabled (IDT)", COLOR_WHITE);
-        return;
-    }
-    
-    // COLORS
-    if (strcmp(cmd, "colors") == 0) {
-        shell_println("Color Palette Test:", COLOR_WHITE);
-        shell_println("RED - Primary Alert", COLOR_RED);
-        shell_println("GREEN - Success Status", COLOR_GREEN);
-        shell_println("BLUE - Information", COLOR_BLUE);
-        shell_println("YELLOW - Warning", COLOR_YELLOW);
-        shell_println("CYAN - Highlight", COLOR_CYAN);
-        shell_println("MAGENTA - Special", COLOR_MAGENTA);
-        shell_println("ORANGE - Notice", COLOR_ORANGE);
-        shell_println("PURPLE - Debug", COLOR_PURPLE);
+        shell_println("  File System: FAT12", COLOR_WHITE);
+        shell_println("  Disk: ATA/IDE Primary Master", COLOR_WHITE);
         return;
     }
     
@@ -244,7 +432,6 @@ void shell_execute(const char* cmd) {
             return;
         }
         
-        // Redraw with new wallpaper
         draw_wallpaper();
         draw_terminal_window();
         current_line = 0;
@@ -252,20 +439,12 @@ void shell_execute(const char* cmd) {
         return;
     }
     
-    // ECHO
-    if (starts_with(cmd, "echo ")) {
-        shell_println(cmd + 5, COLOR_YELLOW);
-        return;
-    }
-    
     // REBOOT
     if (strcmp(cmd, "reboot") == 0) {
         shell_println("Rebooting system...", COLOR_YELLOW);
         
-        // Wait a moment
         for (volatile int i = 0; i < 50000000; i++);
         
-        // Keyboard controller reboot
         unsigned char temp;
         __asm__ __volatile__("inb %1, %0" : "=a"(temp) : "Nd"((unsigned short)0x64));
         while (temp & 0x02) {
@@ -276,7 +455,6 @@ void shell_execute(const char* cmd) {
         return;
     }
     
-    // Unknown command
     shell_println("Unknown command. Type 'help' for available commands.", COLOR_LIGHT_RED);
 }
 
@@ -305,18 +483,14 @@ void shell_handle_key(char c) {
 void shell_init() {
     cmd_index = 0;
     current_line = 0;
-    current_wallpaper = 3; // Start with geometric wallpaper
+    current_wallpaper = 3;
     
     draw_wallpaper();
     draw_terminal_window();
     
     shell_println("", COLOR_WHITE);
-    shell_println("Welcome to SEPPUKU OS - 1080p Edition!", COLOR_LIGHT_CYAN);
-    
-    int w = graphics_get_width();
-    int h = graphics_get_height();
-    shell_println("Display initialized successfully!", COLOR_GREEN);
-    
+    shell_println("Welcome to SEPPUKU OS - File System Edition!", COLOR_LIGHT_CYAN);
+    shell_println("FAT12 file system initialized successfully!", COLOR_GREEN);
     shell_println("Type 'help' for available commands.", COLOR_LIGHT_GRAY);
     shell_println("", COLOR_WHITE);
     

@@ -1,13 +1,15 @@
 #include "../Lib/include/graphics.h"
 #include "../Lib/include/idt.h"
 #include "../Lib/include/keyboard.h"
+#include "../Lib/include/ata.h"
+#include "../Lib/include/fat12.h"
 #include "../user/shell/shell.h"
 
 void kernel_main() {
     // Initialize graphics mode
     graphics_init();
     
-    // Clear screen with dark blue
+    // Clear screen
     graphics_clear(RGB(0, 0, 0));
     
     // Draw boot logo
@@ -20,8 +22,8 @@ void kernel_main() {
     }
     
     // Draw title
-    graphics_draw_string(cx - 100, cy + 70, "SEPPUKU OS v1.2", COLOR_WHITE);
-    graphics_draw_string(cx - 80, cy + 85, "Graphical Edition", COLOR_LIGHT_CYAN);
+    graphics_draw_string(cx - 120, cy + 70, "SEPPUKU OS v1.3", COLOR_WHITE);
+    graphics_draw_string(cx - 110, cy + 85, "File System Edition", COLOR_LIGHT_CYAN);
     
     // Boot messages
     int y = cy + 110;
@@ -39,19 +41,47 @@ void kernel_main() {
         graphics_draw_string(228, y, "1024x768", COLOR_WHITE);
     } else if (w == 1280 && h == 1024) {
         graphics_draw_string(228, y, "1280x1024", COLOR_WHITE);
+    } else if (w == 1920 && h == 1080) {
+        graphics_draw_string(228, y, "1920x1080", COLOR_WHITE);
     } else {
         graphics_draw_string(228, y, "Unknown", COLOR_WHITE);
     }
     y += 12;
     
     graphics_draw_string(100, y, "[...] Initializing IDT...", COLOR_YELLOW);
+    
+    // Small delay
+    for (volatile int i = 0; i < 1000000; i++);
+    
     idt_init();
     graphics_draw_string(260, y, " OK", COLOR_GREEN);
     y += 12;
     
     graphics_draw_string(100, y, "[...] Initializing keyboard...", COLOR_YELLOW);
+    
+    // Small delay
+    for (volatile int i = 0; i < 1000000; i++);
+    
     keyboard_init();
     graphics_draw_string(292, y, " OK", COLOR_GREEN);
+    y += 12;
+    
+    graphics_draw_string(100, y, "[...] Initializing ATA disk...", COLOR_YELLOW);
+    
+    // Small delay
+    for (volatile int i = 0; i < 10000000; i++);
+    
+    ata_init();
+    graphics_draw_string(292, y, " OK", COLOR_GREEN);
+    y += 12;
+    
+    graphics_draw_string(100, y, "[...] Mounting FAT12 filesystem...", COLOR_YELLOW);
+    
+    // Longer delay before mounting
+    for (volatile int i = 0; i < 10000000; i++);
+    
+    fat12_init();
+    graphics_draw_string(316, y, " OK", COLOR_GREEN);
     y += 12;
     
     graphics_draw_string(100, y, "[...] Starting shell...", COLOR_YELLOW);
@@ -61,8 +91,8 @@ void kernel_main() {
     y += 20;
     graphics_draw_string(100, y, ">>> BOOT SUCCESSFUL <<<", COLOR_LIGHT_GREEN);
     
-    // Wait a moment
-    for (volatile int i = 0; i < 500000000; i++);
+    // Wait longer before starting shell
+    for (volatile int i = 0; i < 100000000; i++);
     
     // Start graphical shell
     shell_run();
