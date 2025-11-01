@@ -8,7 +8,7 @@ void kernel_main() {
     graphics_init();
     
     // Clear screen with dark blue
-    graphics_clear(RGB(10, 20, 80));
+    graphics_clear(RGB(0, 0, 0));
     
     // Draw boot logo
     int cx = graphics_get_width() / 2;
@@ -16,7 +16,7 @@ void kernel_main() {
     
     // Draw circles for logo
     for (int r = 50; r > 30; r -= 2) {
-        graphics_draw_circle(cx, cy, r, COLOR_RED);
+       graphics_draw_circle(cx, cy, r, RGB(200, 200, 200));
     }
     
     // Draw title

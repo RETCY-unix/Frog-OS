@@ -44,35 +44,39 @@ void graphics_draw_aurora_wallpaper();
 #define RGB(r, g, b) (((r) << 16) | ((g) << 8) | (b))
 
 // Common colors (24/32-bit RGB)
+
+// Replace all the COLOR_* definitions with:
+// Replace all the COLOR_* definitions with:
 #define COLOR_BLACK         0x000000
 #define COLOR_WHITE         0xFFFFFF
-#define COLOR_RED           0xFF0000
-#define COLOR_GREEN         0x00FF00
-#define COLOR_BLUE          0x0000FF
-#define COLOR_YELLOW        0xFFFF00
-#define COLOR_CYAN          0x00FFFF
-#define COLOR_MAGENTA       0xFF00FF
-#define COLOR_ORANGE        0xFF8000
-#define COLOR_PURPLE        0x8000FF
-#define COLOR_PINK          0xFF69B4
-#define COLOR_LIME          0x00FF00
-#define COLOR_DARK_GRAY     0x404040
-#define COLOR_GRAY          0x808080
-#define COLOR_LIGHT_GRAY    0xC0C0C0
-#define COLOR_DARK_BLUE     0x000080
-#define COLOR_LIGHT_BLUE    0x87CEEB
-#define COLOR_DARK_GREEN    0x006400
-#define COLOR_LIGHT_GREEN   0x90EE90
-#define COLOR_DARK_RED      0x8B0000
-#define COLOR_BROWN         0x8B4513
-#define COLOR_LIGHT_RED     0xFF6666
-#define COLOR_LIGHT_CYAN    0xE0FFFF
+#define COLOR_RED           0xFFFFFF  // Changed to white
+#define COLOR_GREEN         0xFFFFFF  // Changed to white
+#define COLOR_BLUE          0xFFFFFF  // Changed to white
+#define COLOR_YELLOW        0xFFFFFF  // Changed to white
+#define COLOR_CYAN          0xFFFFFF  // Changed to white
+#define COLOR_MAGENTA       0xFFFFFF  // Changed to white
+#define COLOR_ORANGE        0xFFFFFF  // Changed to white
+#define COLOR_PURPLE        0xFFFFFF  // Changed to white
+#define COLOR_PINK          0xFFFFFF  // Changed to white
+#define COLOR_LIME          0xFFFFFF  // Changed to white
+#define COLOR_DARK_GRAY     0x404040  // Keep as dark gray
+#define COLOR_GRAY          0x808080  // Keep as medium gray
+#define COLOR_LIGHT_GRAY    0xC0C0C0  // Keep as light gray
+#define COLOR_DARK_BLUE     0xFFFFFF  // Changed to white
+#define COLOR_LIGHT_BLUE    0xFFFFFF  // Changed to white
+#define COLOR_DARK_GREEN    0xFFFFFF  // Changed to white
+#define COLOR_LIGHT_GREEN   0xFFFFFF  // Changed to white
+#define COLOR_DARK_RED      0xFFFFFF  // Changed to white
+#define COLOR_BROWN         0xFFFFFF  // Changed to white
+#define COLOR_LIGHT_RED     0xFFFFFF  // Changed to white
+#define COLOR_LIGHT_CYAN    0xFFFFFF  // Changed to white
 
-// Modern UI colors
-#define COLOR_UI_BG         RGB(15, 20, 45)
-#define COLOR_UI_SURFACE    RGB(25, 35, 70)
-#define COLOR_UI_PRIMARY    RGB(60, 90, 180)
-#define COLOR_UI_ACCENT     RGB(100, 150, 255)
-#define COLOR_UI_TEXT       RGB(220, 230, 255)
+// Modern UI colors - all grayscale now
+#define COLOR_UI_BG         RGB(0, 0, 0)      // Black
+#define COLOR_UI_SURFACE    RGB(30, 30, 30)   // Dark gray
+#define COLOR_UI_PRIMARY    RGB(80, 80, 80)   // Medium gray
+#define COLOR_UI_ACCENT     RGB(150, 150, 150) // Light gray
+#define COLOR_UI_TEXT       RGB(255, 255, 255) // White
 
 #endif
+

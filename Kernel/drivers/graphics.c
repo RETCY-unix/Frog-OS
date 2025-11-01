@@ -289,38 +289,29 @@ void graphics_draw_string(int x, int y, const char* str, unsigned int color) {
 // Generate a beautiful gradient wallpaper
 void graphics_draw_gradient_wallpaper() {
     for (int y = 0; y < screen_height; y++) {
-        // Create smooth gradient from top to bottom
         float t = (float)y / screen_height;
+        unsigned char gray = (unsigned char)(20 + t * 100); // Gradient from dark to light gray
+        unsigned int color = RGB(gray, gray, gray);
         
-        // Purple to blue gradient
-        unsigned char r = (unsigned char)(20 + t * 40);
-        unsigned char g = (unsigned char)(10 + t * 70);
-        unsigned char b = (unsigned char)(60 + t * 120);
-        
-        unsigned int color = RGB(r, g, b);
-        
-        // Fast horizontal line draw
         for (int x = 0; x < screen_width; x++) {
             graphics_put_pixel(x, y, color);
         }
     }
 }
-
 // Draw abstract wallpaper with circles
 void graphics_draw_abstract_wallpaper() {
-    // Base gradient
     graphics_draw_gradient_wallpaper();
     
-    // Add decorative circles at various positions
+    // Change all circle colors to grayscale
     int circles[][4] = {
-        {100, 100, 60, RGB(80, 40, 120)},
-        {screen_width - 120, 80, 80, RGB(60, 80, 160)},
-        {screen_width / 3, screen_height / 4, 100, RGB(100, 50, 140)},
-        {screen_width - 200, screen_height - 150, 120, RGB(70, 90, 180)},
-        {150, screen_height - 120, 90, RGB(90, 60, 150)},
-        {screen_width / 2, screen_height / 2, 140, RGB(50, 70, 130)},
-        {screen_width / 4, screen_height * 3 / 4, 70, RGB(110, 80, 160)},
-        {screen_width * 3 / 4, screen_height / 3, 85, RGB(65, 95, 170)}
+        {100, 100, 60, RGB(60, 60, 60)},
+        {screen_width - 120, 80, 80, RGB(80, 80, 80)},
+        {screen_width / 3, screen_height / 4, 100, RGB(100, 100, 100)},
+        {screen_width - 200, screen_height - 150, 120, RGB(70, 70, 70)},
+        {150, screen_height - 120, 90, RGB(90, 90, 90)},
+        {screen_width / 2, screen_height / 2, 140, RGB(50, 50, 50)},
+        {screen_width / 4, screen_height * 3 / 4, 70, RGB(110, 110, 110)},
+        {screen_width * 3 / 4, screen_height / 3, 85, RGB(65, 65, 65)}
     };
     
     // Draw semi-transparent circles (multiple passes for alpha effect)
@@ -341,23 +332,17 @@ void graphics_draw_abstract_wallpaper() {
 void graphics_draw_wave_wallpaper() {
     for (int y = 0; y < screen_height; y++) {
         for (int x = 0; x < screen_width; x++) {
-            // Create wave patterns using sine-like approximation
             int wave1 = (x / 20 + y / 30) % 60;
             int wave2 = (x / 30 - y / 20) % 50;
             
-            unsigned char r = 15 + wave1;
-            unsigned char g = 25 + wave2;
-            unsigned char b = 80 + (wave1 + wave2) / 2;
-            
-            graphics_put_pixel(x, y, RGB(r, g, b));
+            unsigned char gray = 40 + (wave1 + wave2) / 2;
+            graphics_put_pixel(x, y, RGB(gray, gray, gray));
         }
     }
 }
-
 // Draw modern geometric wallpaper
 void graphics_draw_geometric_wallpaper() {
-    // Dark blue base
-    graphics_clear(RGB(15, 20, 45));
+    graphics_clear(RGB(15, 15, 15)); // Dark gray base
     
     // Draw diagonal stripes
     for (int i = 0; i < screen_width + screen_height; i += 80) {
@@ -369,63 +354,50 @@ void graphics_draw_geometric_wallpaper() {
             
             if (x1 >= 0 && x1 < screen_width) {
                 graphics_draw_line(x1, y1, x2 < screen_width ? x2 : screen_width, 
-                                 y2, RGB(25, 35, 70));
+                                 y2, RGB(40, 40, 40));
             }
         }
     }
     
-    // Add some accent circles
-    graphics_fill_circle(screen_width / 4, screen_height / 4, 100, RGB(40, 60, 100));
-    graphics_fill_circle(screen_width * 3 / 4, screen_height * 3 / 4, 120, RGB(50, 70, 110));
-    graphics_draw_circle(screen_width / 2, screen_height / 2, 150, RGB(60, 90, 140));
-    graphics_draw_circle(screen_width / 2, screen_height / 2, 155, RGB(60, 90, 140));
-    graphics_draw_circle(screen_width / 2, screen_height / 2, 160, RGB(60, 90, 140));
+    graphics_fill_circle(screen_width / 4, screen_height / 4, 100, RGB(60, 60, 60));
+    graphics_fill_circle(screen_width * 3 / 4, screen_height * 3 / 4, 120, RGB(70, 70, 70));
+    graphics_draw_circle(screen_width / 2, screen_height / 2, 150, RGB(100, 100, 100));
+    graphics_draw_circle(screen_width / 2, screen_height / 2, 155, RGB(100, 100, 100));
+    graphics_draw_circle(screen_width / 2, screen_height / 2, 160, RGB(100, 100, 100));
 }
-
 // Aurora/Northern Lights effect
 void graphics_draw_aurora_wallpaper() {
     // Dark sky background
     for (int y = 0; y < screen_height; y++) {
         float t = (float)y / screen_height;
-        unsigned char r = (unsigned char)(5 + t * 15);
-        unsigned char g = (unsigned char)(10 + t * 20);
-        unsigned char b = (unsigned char)(25 + t * 35);
+        unsigned char gray = (unsigned char)(10 + t * 30);
         
         for (int x = 0; x < screen_width; x++) {
-            graphics_put_pixel(x, y, RGB(r, g, b));
+            graphics_put_pixel(x, y, RGB(gray, gray, gray));
         }
     }
     
-    // Aurora waves (simplified sine approximation)
+    // Aurora waves in grayscale
     for (int y = screen_height / 3; y < screen_height * 2 / 3; y++) {
         for (int x = 0; x < screen_width; x++) {
-            // Simple wave calculation
             int wave = ((x / 10) % 40) - 20;
             int distance = y - (screen_height / 2 + wave);
             
             if (distance < 0) distance = -distance;
             
             if (distance < 60) {
-                unsigned char g = 200 - distance * 3;
-                unsigned char b = 150 - distance * 2;
-                unsigned char r = 50;
+                unsigned char gray = 150 - distance * 2;
                 
-                // Blend with background
                 unsigned int current = graphics_get_pixel(x, y);
-                unsigned char cr = (current >> 16) & 0xFF;
-                unsigned char cg = (current >> 8) & 0xFF;
-                unsigned char cb = current & 0xFF;
+                unsigned char cg = current & 0xFF;
                 
-                cr = (cr + r) / 2;
-                cg = (cg + g) / 2;
-                cb = (cb + b) / 2;
-                
-                graphics_put_pixel(x, y, RGB(cr, cg, cb));
+                cg = (cg + gray) / 2;
+                graphics_put_pixel(x, y, RGB(cg, cg, cg));
             }
         }
     }
     
-    // Add stars
+    // White stars
     for (int i = 0; i < 200; i++) {
         int x = (i * 97 + 13) % screen_width;
         int y = (i * 73 + 29) % (screen_height / 2);

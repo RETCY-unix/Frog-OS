@@ -59,6 +59,7 @@ void draw_wallpaper() {
 }
 
 // Draw terminal window
+// Draw terminal window
 void draw_terminal_window() {
     int width = graphics_get_width();
     int height = graphics_get_height();
@@ -71,26 +72,27 @@ void draw_terminal_window() {
     // Window shadow
     graphics_fill_rect(term_x + 5, term_y + 5, term_width, term_height, RGB(0, 0, 0));
     
-    // Window background with transparency effect
-    graphics_fill_rect(term_x, term_y, term_width, term_height, RGB(20, 25, 40));
+    // Window background - dark gray
+    graphics_fill_rect(term_x, term_y, term_width, term_height, RGB(20, 20, 20));
     
-    // Window border with gradient
-    graphics_draw_rect(term_x, term_y, term_width, term_height, RGB(80, 120, 200));
-    graphics_draw_rect(term_x + 1, term_y + 1, term_width - 2, term_height - 2, RGB(60, 100, 180));
+    // Window border - light gray
+    graphics_draw_rect(term_x, term_y, term_width, term_height, RGB(120, 120, 120));
+    graphics_draw_rect(term_x + 1, term_y + 1, term_width - 2, term_height - 2, RGB(100, 100, 100));
     
     // Title bar with gradient
     for (int i = 0; i < 20; i++) {
-        unsigned char b = 120 - i * 2;
-        graphics_fill_rect(term_x + 2, term_y + 2 + i, term_width - 4, 1, RGB(40, 60, b));
+        unsigned char gray = 80 - i * 2;
+        graphics_fill_rect(term_x + 2, term_y + 2 + i, term_width - 4, 1, RGB(gray, gray, gray));
     }
     
     graphics_draw_string(term_x + 10, term_y + 7, "SEPPUKU OS Terminal v1.2 - 1080p Edition", COLOR_WHITE);
     
-    // Window control buttons
-    graphics_fill_circle(term_x + term_width - 20, term_y + 12, 5, COLOR_RED);
-    graphics_fill_circle(term_x + term_width - 35, term_y + 12, 5, COLOR_YELLOW);
-    graphics_fill_circle(term_x + term_width - 50, term_y + 12, 5, COLOR_GREEN);
+    // Window control buttons - all grayscale
+    graphics_fill_circle(term_x + term_width - 20, term_y + 12, 5, RGB(200, 200, 200));
+    graphics_fill_circle(term_x + term_width - 35, term_y + 12, 5, RGB(150, 150, 150));
+    graphics_fill_circle(term_x + term_width - 50, term_y + 12, 5, RGB(100, 100, 100));
 }
+
 
 // Print text
 void shell_println(const char* text, unsigned int color) {
