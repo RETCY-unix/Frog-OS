@@ -1,20 +1,31 @@
 #include "../../Lib/include/graphics.h"
 #include "../../Lib/include/keyboard.h"
-#include "../../Lib/include/fat12.h"
 
 #define MAX_COMMAND_LENGTH 256
 #define LINE_HEIGHT 10
 #define MAX_LINES 100
-#define MAX_FILE_SIZE 4096
+
+// Window state
+static int window_minimized = 0;
+static int window_maximized = 0;
+
+// Normal window dimensions
+static int normal_term_x = 30;
+static int normal_term_y = 30;
+static int normal_term_width = 0;
+static int normal_term_height = 0;
+
+// Current window dimensions
+static int term_x = 30;
+static int term_y = 30;
+static int term_width = 0;
+static int term_height = 0;
 
 // Command buffer
 static char command_buffer[MAX_COMMAND_LENGTH];
 static int cmd_index = 0;
 static int current_line = 0;
 static int current_wallpaper = 0;
-
-// File buffer
-static unsigned char file_buffer[MAX_FILE_SIZE];
 
 // String utilities
 int strcmp(const char* s1, const char* s2) {
@@ -70,25 +81,62 @@ void draw_wallpaper() {
     }
 }
 
+// Draw minimize icon
+void draw_minimize_icon(int x, int y) {
+    // Horizontal line
+    graphics_draw_line(x - 3, y, x + 3, y, RGB(40, 40, 40));
+}
+
+// Draw maximize icon
+void draw_maximize_icon(int x, int y) {
+    if (window_maximized) {
+        // Two overlapping squares (restore icon)
+        graphics_draw_rect(x - 3, y - 2, 5, 5, RGB(40, 40, 40));
+        graphics_draw_rect(x - 1, y - 4, 5, 5, RGB(40, 40, 40));
+    } else {
+        // Single square (maximize icon)
+        graphics_draw_rect(x - 3, y - 3, 7, 7, RGB(40, 40, 40));
+    }
+}
+
+// Draw close icon
+void draw_close_icon(int x, int y) {
+    // X shape
+    graphics_draw_line(x - 3, y - 3, x + 3, y + 3, RGB(40, 40, 40));
+    graphics_draw_line(x - 3, y + 3, x + 3, y - 3, RGB(40, 40, 40));
+}
+
 // Draw terminal window
 void draw_terminal_window() {
     int width = graphics_get_width();
     int height = graphics_get_height();
     
-    int term_x = 30;
-    int term_y = 30;
-    int term_width = width - 60;
-    int term_height = height - 60;
+    // Update dimensions based on state
+    if (window_maximized) {
+        term_x = 0;
+        term_y = 0;
+        term_width = width;
+        term_height = height;
+    } else {
+        term_x = normal_term_x;
+        term_y = normal_term_y;
+        term_width = normal_term_width;
+        term_height = normal_term_height;
+    }
     
-    // Window shadow
-    graphics_fill_rect(term_x + 5, term_y + 5, term_width, term_height, RGB(0, 0, 0));
+    // Window shadow (if not maximized)
+    if (!window_maximized) {
+        graphics_fill_rect(term_x + 5, term_y + 5, term_width, term_height, RGB(0, 0, 0));
+    }
     
     // Window background - dark gray
     graphics_fill_rect(term_x, term_y, term_width, term_height, RGB(20, 20, 20));
     
-    // Window border - light gray
-    graphics_draw_rect(term_x, term_y, term_width, term_height, RGB(120, 120, 120));
-    graphics_draw_rect(term_x + 1, term_y + 1, term_width - 2, term_height - 2, RGB(100, 100, 100));
+    // Window border - light gray (if not maximized)
+    if (!window_maximized) {
+        graphics_draw_rect(term_x, term_y, term_width, term_height, RGB(120, 120, 120));
+        graphics_draw_rect(term_x + 1, term_y + 1, term_width - 2, term_height - 2, RGB(100, 100, 100));
+    }
     
     // Title bar with gradient
     for (int i = 0; i < 20; i++) {
@@ -96,18 +144,65 @@ void draw_terminal_window() {
         graphics_fill_rect(term_x + 2, term_y + 2 + i, term_width - 4, 1, RGB(gray, gray, gray));
     }
     
-    graphics_draw_string(term_x + 10, term_y + 7, "SEPPUKU OS Terminal v1.2 - File System Edition", COLOR_WHITE);
+    graphics_draw_string(term_x + 10, term_y + 7, "SEPPUKU OS Terminal v1.3", COLOR_WHITE);
     
-    // Window control buttons
-    graphics_fill_circle(term_x + term_width - 20, term_y + 12, 5, RGB(200, 200, 200));
-    graphics_fill_circle(term_x + term_width - 35, term_y + 12, 5, RGB(150, 150, 150));
-    graphics_fill_circle(term_x + term_width - 50, term_y + 12, 5, RGB(100, 100, 100));
+    // Window control buttons with hover effects
+    int btn_y = term_y + 12;
+    
+    // Close button (red when hovered)
+    graphics_fill_circle(term_x + term_width - 20, btn_y, 6, RGB(200, 200, 200));
+    graphics_fill_circle(term_x + term_width - 20, btn_y, 5, RGB(255, 95, 86));
+    draw_close_icon(term_x + term_width - 20, btn_y);
+    
+    // Maximize button (green when hovered)
+    graphics_fill_circle(term_x + term_width - 40, btn_y, 6, RGB(150, 150, 150));
+    graphics_fill_circle(term_x + term_width - 40, btn_y, 5, RGB(40, 201, 64));
+    draw_maximize_icon(term_x + term_width - 40, btn_y);
+    
+    // Minimize button (yellow when hovered)
+    graphics_fill_circle(term_x + term_width - 60, btn_y, 6, RGB(100, 100, 100));
+    graphics_fill_circle(term_x + term_width - 60, btn_y, 5, RGB(255, 189, 46));
+    draw_minimize_icon(term_x + term_width - 60, btn_y);
+}
+
+// Draw minimized taskbar
+void draw_minimized_taskbar() {
+    int width = graphics_get_width();
+    int height = graphics_get_height();
+    
+    // Taskbar at bottom
+    int taskbar_height = 40;
+    graphics_fill_rect(0, height - taskbar_height, width, taskbar_height, RGB(40, 40, 40));
+    graphics_draw_line(0, height - taskbar_height, width, height - taskbar_height, RGB(100, 100, 100));
+    
+    // Terminal icon/button
+    int btn_x = 20;
+    int btn_y = height - taskbar_height + 5;
+    int btn_w = 150;
+    int btn_h = 30;
+    
+    // Button background
+    graphics_fill_rect(btn_x, btn_y, btn_w, btn_h, RGB(60, 60, 60));
+    graphics_draw_rect(btn_x, btn_y, btn_w, btn_h, RGB(100, 100, 100));
+    
+    // Terminal icon (small square)
+    graphics_fill_rect(btn_x + 5, btn_y + 7, 16, 16, RGB(20, 20, 20));
+    graphics_draw_rect(btn_x + 5, btn_y + 7, 16, 16, RGB(150, 150, 150));
+    graphics_draw_string(btn_x + 8, btn_y + 10, ">_", COLOR_WHITE);
+    
+    // Text
+    graphics_draw_string(btn_x + 25, btn_y + 10, "Terminal", COLOR_WHITE);
+    
+    // Click hint
+    graphics_draw_string(width - 200, height - taskbar_height + 12, "Press Space to restore", RGB(180, 180, 180));
 }
 
 // Print text
 void shell_println(const char* text, unsigned int color) {
-    int term_x = 40;
-    int term_y = 60;
+    if (window_minimized) return;
+    
+    int start_x = term_x + 10;
+    int start_y = term_y + 30;
     
     if (current_line >= MAX_LINES) {
         current_line = MAX_LINES - 5;
@@ -115,63 +210,61 @@ void shell_println(const char* text, unsigned int color) {
         draw_terminal_window();
     }
     
-    graphics_draw_string(term_x, term_y + current_line * LINE_HEIGHT, text, color);
+    graphics_draw_string(start_x, start_y + current_line * LINE_HEIGHT, text, color);
     current_line++;
 }
 
 // Redraw prompt line
 void redraw_prompt() {
-    int term_x = 40;
-    int term_y = 60;
-    int y = term_y + current_line * LINE_HEIGHT;
+    if (window_minimized) return;
+    
+    int start_x = term_x + 10;
+    int start_y = term_y + 30;
+    int y = start_y + current_line * LINE_HEIGHT;
     
     // Clear prompt line
-    graphics_fill_rect(term_x, y, graphics_get_width() - 80, LINE_HEIGHT, RGB(20, 20, 20));
+    graphics_fill_rect(start_x, y, term_width - 20, LINE_HEIGHT, RGB(20, 20, 20));
     
     // Draw prompt
-    graphics_draw_string(term_x, y, "root@seppuku:~$ ", COLOR_LIGHT_GREEN);
+    graphics_draw_string(start_x, y, "root@seppuku:~$ ", COLOR_LIGHT_GREEN);
     
     // Draw command
-    graphics_draw_string(term_x + 136, y, command_buffer, COLOR_WHITE);
+    graphics_draw_string(start_x + 136, y, command_buffer, COLOR_WHITE);
     
     // Draw cursor
-    int cursor_x = term_x + 136 + (cmd_index * 8);
+    int cursor_x = start_x + 136 + (cmd_index * 8);
     graphics_fill_rect(cursor_x, y, 8, 8, RGB(150, 150, 150));
 }
 
-// Convert int to string
-void int_to_str(int num, char* str) {
-    if (num == 0) {
-        str[0] = '0';
-        str[1] = '\0';
-        return;
+// Toggle minimize
+void toggle_minimize() {
+    window_minimized = !window_minimized;
+    
+    draw_wallpaper();
+    
+    if (window_minimized) {
+        draw_minimized_taskbar();
+    } else {
+        draw_terminal_window();
+        redraw_prompt();
+    }
+}
+
+// Toggle maximize
+void toggle_maximize() {
+    if (window_minimized) return;
+    
+    window_maximized = !window_maximized;
+    
+    draw_wallpaper();
+    draw_terminal_window();
+    
+    // Reset line counter if maximized to use more space
+    if (window_maximized) {
+        current_line = 0;
     }
     
-    int i = 0;
-    int is_negative = 0;
-    
-    if (num < 0) {
-        is_negative = 1;
-        num = -num;
-    }
-    
-    while (num > 0) {
-        str[i++] = '0' + (num % 10);
-        num /= 10;
-    }
-    
-    if (is_negative) {
-        str[i++] = '-';
-    }
-    
-    str[i] = '\0';
-    
-    // Reverse
-    for (int j = 0; j < i / 2; j++) {
-        char temp = str[j];
-        str[j] = str[i - j - 1];
-        str[i - j - 1] = temp;
-    }
+    redraw_prompt();
 }
 
 // Execute command
@@ -182,156 +275,15 @@ void shell_execute(const char* cmd) {
         return;
     }
     
-    // LS - List files
-    if (strcmp(cmd, "ls") == 0) {
-        fat12_entry_t entries[50];
-        int count = fat12_list_files(entries, 50);
-        
-        if (count == 0) {
-            shell_println("No files found.", COLOR_YELLOW);
-        } else {
-            shell_println("Files:", COLOR_CYAN);
-            
-            for (int i = 0; i < count; i++) {
-                char filename[13];
-                int j = 0;
-                
-                // Copy name
-                for (int k = 0; k < 8 && entries[i].filename[k] != ' '; k++) {
-                    filename[j++] = entries[i].filename[k];
-                }
-                
-                // Add dot if extension exists
-                if (entries[i].filename[8] != ' ') {
-                    filename[j++] = '.';
-                    for (int k = 8; k < 11 && entries[i].filename[k] != ' '; k++) {
-                        filename[j++] = entries[i].filename[k];
-                    }
-                }
-                
-                filename[j] = '\0';
-                
-                // Print filename and size
-                char line[64];
-                char size_str[16];
-                int_to_str(entries[i].file_size, size_str);
-                
-                strcpy(line, "  ");
-                int pos = 2;
-                for (int k = 0; filename[k]; k++) {
-                    line[pos++] = filename[k];
-                }
-                while (pos < 20) line[pos++] = ' ';
-                for (int k = 0; size_str[k]; k++) {
-                    line[pos++] = size_str[k];
-                }
-                line[pos++] = ' ';
-                line[pos++] = 'b';
-                line[pos++] = 'y';
-                line[pos++] = 't';
-                line[pos++] = 'e';
-                line[pos++] = 's';
-                line[pos] = '\0';
-                
-                shell_println(line, COLOR_WHITE);
-            }
-        }
+    // MINIMIZE
+    if (strcmp(cmd, "minimize") == 0 || strcmp(cmd, "min") == 0) {
+        toggle_minimize();
         return;
     }
     
-    // CAT - Read file
-    if (starts_with(cmd, "cat ")) {
-        const char* filename = cmd + 4;
-        
-        int size = fat12_read_file(filename, file_buffer, MAX_FILE_SIZE);
-        
-        if (size < 0) {
-            shell_println("Error: File not found", COLOR_RED);
-        } else {
-            // Print file contents
-            file_buffer[size] = '\0';
-            
-            char line[81];
-            int line_pos = 0;
-            
-            for (int i = 0; i < size; i++) {
-                if (file_buffer[i] == '\n' || line_pos >= 80) {
-                    line[line_pos] = '\0';
-                    shell_println(line, COLOR_WHITE);
-                    line_pos = 0;
-                } else if (file_buffer[i] >= 32 && file_buffer[i] < 127) {
-                    line[line_pos++] = file_buffer[i];
-                }
-            }
-            
-            if (line_pos > 0) {
-                line[line_pos] = '\0';
-                shell_println(line, COLOR_WHITE);
-            }
-        }
-        return;
-    }
-    
-    // ECHO > file - Write to file
-    if (starts_with(cmd, "echo ")) {
-        const char* rest = cmd + 5;
-        const char* arrow = rest;
-        
-        // Find " > "
-        while (*arrow && !(*arrow == ' ' && *(arrow+1) == '>' && *(arrow+2) == ' ')) {
-            arrow++;
-        }
-        
-        if (*arrow) {
-            // Extract text and filename
-            int text_len = arrow - rest;
-            const char* filename = arrow + 3;
-            
-            // Copy text
-            for (int i = 0; i < text_len && i < MAX_FILE_SIZE; i++) {
-                file_buffer[i] = rest[i];
-            }
-            
-            int result = fat12_write_file(filename, file_buffer, text_len);
-            
-            if (result < 0) {
-                shell_println("Error: Could not write file", COLOR_RED);
-            } else {
-                shell_println("File written successfully", COLOR_GREEN);
-            }
-        } else {
-            // Just echo
-            shell_println(rest, COLOR_YELLOW);
-        }
-        return;
-    }
-    
-    // RM - Delete file
-    if (starts_with(cmd, "rm ")) {
-        const char* filename = cmd + 3;
-        
-        if (fat12_delete_file(filename) == 0) {
-            shell_println("File deleted", COLOR_GREEN);
-        } else {
-            shell_println("Error: File not found", COLOR_RED);
-        }
-        return;
-    }
-    
-    // TOUCH - Create empty file
-    if (starts_with(cmd, "touch ")) {
-        const char* filename = cmd + 6;
-        
-        if (fat12_file_exists(filename)) {
-            shell_println("File already exists", COLOR_YELLOW);
-        } else {
-            file_buffer[0] = '\0';
-            if (fat12_write_file(filename, file_buffer, 0) >= 0) {
-                shell_println("File created", COLOR_GREEN);
-            } else {
-                shell_println("Error: Could not create file", COLOR_RED);
-            }
-        }
+    // MAXIMIZE
+    if (strcmp(cmd, "maximize") == 0 || strcmp(cmd, "max") == 0) {
+        toggle_maximize();
         return;
     }
     
@@ -342,13 +294,10 @@ void shell_execute(const char* cmd) {
         shell_println("  clear      - Clear screen", COLOR_WHITE);
         shell_println("  about      - About SEPPUKU OS", COLOR_WHITE);
         shell_println("  sysinfo    - System information", COLOR_WHITE);
-        shell_println("  ls         - List files", COLOR_WHITE);
-        shell_println("  cat <file> - Read file", COLOR_WHITE);
         shell_println("  echo <txt> - Echo text", COLOR_WHITE);
-        shell_println("  echo <txt> > <file> - Write to file", COLOR_WHITE);
-        shell_println("  rm <file>  - Delete file", COLOR_WHITE);
-        shell_println("  touch <file> - Create empty file", COLOR_WHITE);
         shell_println("  wallpaper  - Change wallpaper", COLOR_WHITE);
+        shell_println("  minimize   - Minimize window", COLOR_WHITE);
+        shell_println("  maximize   - Maximize window", COLOR_WHITE);
         shell_println("  reboot     - Reboot system", COLOR_WHITE);
         return;
     }
@@ -361,15 +310,22 @@ void shell_execute(const char* cmd) {
         return;
     }
     
+    // ECHO
+    if (starts_with(cmd, "echo ")) {
+        const char* text = cmd + 5;
+        shell_println(text, COLOR_YELLOW);
+        return;
+    }
+    
     // ABOUT
     if (strcmp(cmd, "about") == 0) {
         shell_println("========================================", COLOR_LIGHT_CYAN);
-        shell_println("SEPPUKU OS v1.2 - File System Edition", COLOR_LIGHT_RED);
+        shell_println("SEPPUKU OS v1.3 - Window Manager", COLOR_LIGHT_RED);
         shell_println("========================================", COLOR_LIGHT_CYAN);
-        shell_println("A modern x86 OS with FAT12 filesystem", COLOR_WHITE);
+        shell_println("A modern x86 OS with window management", COLOR_WHITE);
         shell_println("Built from scratch in C and Assembly", COLOR_YELLOW);
         shell_println("Features: Protected mode, IDT, KB,", COLOR_GRAY);
-        shell_println("          Graphics, ATA disk, FAT12", COLOR_GRAY);
+        shell_println("          Graphics, Windows, Wallpapers", COLOR_GRAY);
         shell_println("", COLOR_WHITE);
         return;
     }
@@ -393,8 +349,7 @@ void shell_execute(const char* cmd) {
         shell_println("  Graphics: VESA VBE 2.0+", COLOR_WHITE);
         shell_println("  CPU Mode: 32-bit Protected", COLOR_WHITE);
         shell_println("  Interrupts: Enabled (IDT)", COLOR_WHITE);
-        shell_println("  File System: FAT12", COLOR_WHITE);
-        shell_println("  Disk: ATA/IDE Primary Master", COLOR_WHITE);
+        shell_println("  Window Manager: Active", COLOR_GREEN);
         return;
     }
     
@@ -433,7 +388,11 @@ void shell_execute(const char* cmd) {
         }
         
         draw_wallpaper();
-        draw_terminal_window();
+        if (!window_minimized) {
+            draw_terminal_window();
+        } else {
+            draw_minimized_taskbar();
+        }
         current_line = 0;
         shell_println("Wallpaper changed!", COLOR_GREEN);
         return;
@@ -460,6 +419,14 @@ void shell_execute(const char* cmd) {
 
 // Handle keyboard input
 void shell_handle_key(char c) {
+    // Space key restores from minimize
+    if (c == ' ' && window_minimized) {
+        toggle_minimize();
+        return;
+    }
+    
+    if (window_minimized) return;
+    
     if (c == '\n') {
         command_buffer[cmd_index] = '\0';
         shell_execute(command_buffer);
@@ -484,14 +451,29 @@ void shell_init() {
     cmd_index = 0;
     current_line = 0;
     current_wallpaper = 3;
+    window_minimized = 0;
+    window_maximized = 0;
+    
+    // Set normal window size
+    int width = graphics_get_width();
+    int height = graphics_get_height();
+    normal_term_width = width - 60;
+    normal_term_height = height - 60;
+    
+    term_width = normal_term_width;
+    term_height = normal_term_height;
     
     draw_wallpaper();
     draw_terminal_window();
     
     shell_println("", COLOR_WHITE);
-    shell_println("Welcome to SEPPUKU OS - File System Edition!", COLOR_LIGHT_CYAN);
-    shell_println("FAT12 file system initialized successfully!", COLOR_GREEN);
+    shell_println("Welcome to SEPPUKU OS - Window Manager Edition!", COLOR_LIGHT_CYAN);
     shell_println("Type 'help' for available commands.", COLOR_LIGHT_GRAY);
+    shell_println("", COLOR_WHITE);
+    shell_println("Window controls:", COLOR_CYAN);
+    shell_println("  - Type 'minimize' or press the yellow button", COLOR_WHITE);
+    shell_println("  - Type 'maximize' or press the green button", COLOR_WHITE);
+    shell_println("  - Press Space to restore from minimize", COLOR_WHITE);
     shell_println("", COLOR_WHITE);
     
     redraw_prompt();
