@@ -1,5 +1,6 @@
 #include "../../Lib/include/graphics.h"
 #include "../../Lib/include/keyboard.h"
+#include "../../Lib/include/sound.h"
 #include "../../Lib/include/ata.h"
 #include "../../Lib/include/fat12.h"
 
@@ -143,7 +144,7 @@ void draw_terminal_window() {
         graphics_fill_rect(term_x + 2, term_y + 2 + i, term_width - 4, 1, RGB(gray, gray, gray));
     }
     
-    graphics_draw_string(term_x + 10, term_y + 7, "SEPPUKU OS Terminal v1.4 FS", COLOR_WHITE);
+    graphics_draw_string(term_x + 10, term_y + 7, "SEPPUKU OS Terminal v1.5 SOUND", COLOR_WHITE);
     
     int btn_y = term_y + 12;
     
@@ -256,6 +257,36 @@ void shell_execute(const char* cmd) {
         return;
     }
     
+    // SOUND COMMANDS - THE NEW STUFF!
+    if (strcmp(cmd, "beep") == 0) {
+        shell_println("*BEEP!*", COLOR_YELLOW);
+        sound_beep(BEEP_DEFAULT, 200);
+        return;
+    }
+    
+    if (strcmp(cmd, "chime") == 0) {
+        shell_println("Playing startup chime...", COLOR_CYAN);
+        sound_beep(NOTE_C4, 100);
+        for (volatile int i = 0; i < 1000000; i++);
+        sound_beep(NOTE_E4, 100);
+        for (volatile int i = 0; i < 1000000; i++);
+        sound_beep(NOTE_G4, 150);
+        shell_println("Done!", COLOR_GREEN);
+        return;
+    }
+    
+    if (strcmp(cmd, "siren") == 0) {
+        shell_println("WEEEOOO WEEEOOO!", COLOR_RED);
+        for (int i = 0; i < 3; i++) {
+            sound_beep(800, 200);
+            for (volatile int j = 0; j < 2000000; j++);
+            sound_beep(400, 200);
+            for (volatile int j = 0; j < 2000000; j++);
+        }
+        shell_println("Emergency services on the way!", COLOR_YELLOW);
+        return;
+    }
+    
     // FILE SYSTEM COMMANDS
     if (strcmp(cmd, "mount") == 0) {
         if (fs_mounted) {
@@ -271,13 +302,14 @@ void shell_execute(const char* cmd) {
         
         fs_mounted = 1;
         shell_println("File system mounted successfully!", COLOR_GREEN);
-        shell_println("Use 'ls' to list files", COLOR_WHITE);
+        sound_beep(BEEP_SUCCESS, 100);
         return;
     }
     
     if (strcmp(cmd, "ls") == 0) {
         if (!fs_mounted) {
             shell_println("File system not mounted. Use 'mount' first.", COLOR_RED);
+            sound_beep(BEEP_ERROR, 150);
             return;
         }
         
@@ -290,7 +322,6 @@ void shell_execute(const char* cmd) {
             shell_println("Files:", COLOR_CYAN);
             for (int i = 0; i < count; i++) {
                 char filename[13];
-                // Format 8.3 filename
                 int j = 0;
                 for (int k = 0; k < 8 && entries[i].filename[k] != ' '; k++) {
                     filename[j++] = entries[i].filename[k];
@@ -322,10 +353,10 @@ void shell_execute(const char* cmd) {
         
         if (size < 0) {
             shell_println("File not found or read error", COLOR_RED);
+            sound_beep(BEEP_ERROR, 150);
         } else if (size == 0) {
             shell_println("(empty file)", COLOR_YELLOW);
         } else {
-            // Print file contents
             for (int i = 0; i < size; i++) {
                 char c = buffer[i];
                 if (c == '\n' || c == '\r') {
@@ -348,12 +379,10 @@ void shell_execute(const char* cmd) {
             return;
         }
         
-        // Parse: write filename content
         const char* args = cmd + 6;
         char filename[20];
         int i = 0;
         
-        // Get filename (until space)
         while (args[i] && args[i] != ' ' && i < 19) {
             filename[i] = args[i];
             i++;
@@ -377,8 +406,10 @@ void shell_execute(const char* cmd) {
         
         if (result < 0) {
             shell_println("Write failed", COLOR_RED);
+            sound_beep(BEEP_ERROR, 150);
         } else {
             shell_println("File written successfully!", COLOR_GREEN);
+            sound_beep(BEEP_SUCCESS, 100);
         }
         return;
     }
@@ -395,8 +426,10 @@ void shell_execute(const char* cmd) {
         
         if (result < 0) {
             shell_println("Delete failed (file not found?)", COLOR_RED);
+            sound_beep(BEEP_ERROR, 150);
         } else {
             shell_println("File deleted", COLOR_GREEN);
+            sound_beep(600, 80);
         }
         return;
     }
@@ -421,6 +454,11 @@ void shell_execute(const char* cmd) {
         shell_println("  echo <txt> - Echo text", COLOR_WHITE);
         shell_println("  wallpaper  - Change wallpaper", COLOR_WHITE);
         shell_println("  test       - Run test", COLOR_WHITE);
+        shell_println("", COLOR_WHITE);
+        shell_println("Sound Commands:", COLOR_CYAN);
+        shell_println("  beep       - Simple beep", COLOR_WHITE);
+        shell_println("  chime      - Startup chime", COLOR_WHITE);
+        shell_println("  siren      - Police siren!", COLOR_WHITE);
         shell_println("", COLOR_WHITE);
         shell_println("File System Commands:", COLOR_CYAN);
         shell_println("  mount      - Mount file system", COLOR_WHITE);
@@ -447,7 +485,8 @@ void shell_execute(const char* cmd) {
         shell_println("Shell is functioning correctly", COLOR_WHITE);
         shell_println("Keyboard interrupt working", COLOR_WHITE);
         shell_println("Graphics rendering working", COLOR_WHITE);
-        shell_println("File system linked!", COLOR_GREEN);
+        shell_println("Sound system active!", COLOR_GREEN);
+        sound_beep(NOTE_C5, 100);
         return;
     }
     
@@ -459,12 +498,17 @@ void shell_execute(const char* cmd) {
     
     if (strcmp(cmd, "about") == 0) {
         shell_println("========================================", COLOR_LIGHT_CYAN);
-        shell_println("SEPPUKU OS v1.4", COLOR_LIGHT_RED);
+        shell_println("SEPPUKU OS v1.5", COLOR_LIGHT_RED);
         shell_println("========================================", COLOR_LIGHT_CYAN);
         shell_println("A modern x86 OS with graphics", COLOR_WHITE);
         shell_println("Built from scratch in C and Assembly", COLOR_YELLOW);
-        shell_println("Now with FAT12 file system!", COLOR_GREEN);
+        shell_println("Now with PC Speaker sound!", COLOR_GREEN);
         shell_println("", COLOR_WHITE);
+        sound_beep(NOTE_C4, 80);
+        for (volatile int i = 0; i < 500000; i++);
+        sound_beep(NOTE_E4, 80);
+        for (volatile int i = 0; i < 500000; i++);
+        sound_beep(NOTE_G4, 100);
         return;
     }
     
@@ -487,6 +531,7 @@ void shell_execute(const char* cmd) {
         shell_println("  CPU Mode: 32-bit Protected", COLOR_WHITE);
         shell_println("  Interrupts: Enabled (IDT)", COLOR_WHITE);
         shell_println("  Window Manager: Active", COLOR_GREEN);
+        shell_println("  Sound: PC Speaker Active", COLOR_GREEN);
         
         if (fs_mounted) {
             shell_println("  File System: FAT12 (mounted)", COLOR_GREEN);
@@ -532,11 +577,13 @@ void shell_execute(const char* cmd) {
         }
         current_line = 0;
         shell_println("Wallpaper changed!", COLOR_GREEN);
+        sound_beep(BEEP_SUCCESS, 80);
         return;
     }
     
     if (strcmp(cmd, "reboot") == 0) {
         shell_println("Rebooting system...", COLOR_YELLOW);
+        sound_beep(BEEP_ERROR, 300);
         
         for (volatile int i = 0; i < 50000000; i++);
         
@@ -551,6 +598,7 @@ void shell_execute(const char* cmd) {
     }
     
     shell_println("Unknown command. Type 'help' for available commands.", COLOR_LIGHT_RED);
+    sound_beep(BEEP_ERROR, 100);
 }
 
 // Handle keyboard input
@@ -602,10 +650,10 @@ void shell_init() {
     draw_terminal_window();
     
     shell_println("", COLOR_WHITE);
-    shell_println("Welcome to SEPPUKU OS v1.4!", COLOR_LIGHT_CYAN);
-    shell_println("Now with FAT12 file system support", COLOR_GREEN);
-    shell_println("Type 'help' for available commands.", COLOR_LIGHT_GRAY);
-    shell_println("Type 'mount' to initialize file system.", COLOR_YELLOW);
+    shell_println("Welcome to SEPPUKU OS v1.5!", COLOR_LIGHT_CYAN);
+    shell_println("Now with PC Speaker sound!", COLOR_GREEN);
+    shell_println("Type 'beep', 'chime', or 'siren' to test!", COLOR_YELLOW);
+    shell_println("Type 'help' for all commands.", COLOR_LIGHT_GRAY);
     shell_println("", COLOR_WHITE);
     
     redraw_prompt();

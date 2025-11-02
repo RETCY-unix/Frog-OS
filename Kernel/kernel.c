@@ -1,6 +1,8 @@
 #include "../Lib/include/graphics.h"
 #include "../Lib/include/idt.h"
 #include "../Lib/include/keyboard.h"
+#include "../Lib/include/mouse.h"
+#include "../Lib/include/sound.h"
 #include "../Lib/include/ata.h"
 #include "../user/shell/shell.h"
 
@@ -10,10 +12,6 @@ void kernel_main() {
 
     // Clear screen
     graphics_clear(RGB(0, 0, 0));
-
-    // DEBUG: Show we got here
-    graphics_draw_string(100, 50, "DEBUG: Kernel started", COLOR_WHITE);
-    for (volatile int i = 0; i < 10000000; i++);
 
     // Draw boot logo
     int cx = graphics_get_width() / 2;
@@ -25,8 +23,8 @@ void kernel_main() {
     }
 
     // Draw title
-    graphics_draw_string(cx - 120, cy + 70, "SEPPUKU OS v1.4", COLOR_WHITE);
-    graphics_draw_string(cx - 80, cy + 85, "File System Edition", COLOR_LIGHT_CYAN);
+    graphics_draw_string(cx - 120, cy + 70, "SEPPUKU OS v1.5", COLOR_WHITE);
+    graphics_draw_string(cx - 100, cy + 85, "Sound Edition (Mouse WIP)", COLOR_LIGHT_CYAN);
 
     // Boot messages
     int y = cy + 110;
@@ -54,29 +52,29 @@ void kernel_main() {
     graphics_draw_string(100, y, "[...] Initializing IDT...", COLOR_YELLOW);
     for (volatile int i = 0; i < 1000000; i++);
 
-    graphics_draw_string(100, 400, "DEBUG: Before IDT init", COLOR_RED);
-    for (volatile int i = 0; i < 10000000; i++);
-
     idt_init();
     
-    graphics_draw_string(100, 420, "DEBUG: After IDT init", COLOR_RED);
-    for (volatile int i = 0; i < 10000000; i++);
-
     graphics_draw_string(260, y, " OK", COLOR_GREEN);
     y += 12;
 
     graphics_draw_string(100, y, "[...] Initializing keyboard...", COLOR_YELLOW);
     for (volatile int i = 0; i < 1000000; i++);
 
-    graphics_draw_string(100, 440, "DEBUG: Before keyboard init", COLOR_RED);
-    for (volatile int i = 0; i < 10000000; i++);
-
     keyboard_init();
     
-    graphics_draw_string(100, 460, "DEBUG: After keyboard init", COLOR_RED);
-    for (volatile int i = 0; i < 10000000; i++);
-
     graphics_draw_string(292, y, " OK", COLOR_GREEN);
+    y += 12;
+
+    // SKIP MOUSE FOR NOW - it's causing hangs
+    graphics_draw_string(100, y, "[SKIP] Mouse (causes hang)", COLOR_YELLOW);
+    y += 12;
+
+    graphics_draw_string(100, y, "[...] Initializing sound...", COLOR_YELLOW);
+    for (volatile int i = 0; i < 1000000; i++);
+
+    sound_init();
+    
+    graphics_draw_string(268, y, " OK", COLOR_GREEN);
     y += 12;
 
     graphics_draw_string(100, y, "[OK] ATA driver loaded", COLOR_GREEN);
@@ -89,11 +87,10 @@ void kernel_main() {
     y += 20;
     graphics_draw_string(100, y, ">>> BOOT SUCCESSFUL <<<", COLOR_LIGHT_GREEN);
 
-    graphics_draw_string(100, 480, "DEBUG: Before shell_run", COLOR_RED);
-    for (volatile int i = 0; i < 10000000; i++);
+    // Startup beep!
+    sound_beep(BEEP_SUCCESS, 100);
+    for (volatile int i = 0; i < 5000000; i++);
 
     // Start graphical shell
     shell_run();
-    
-    graphics_draw_string(100, 500, "DEBUG: After shell_run (SHOULDN'T SEE THIS)", COLOR_RED);
 }
