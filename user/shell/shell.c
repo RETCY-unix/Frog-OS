@@ -1,5 +1,6 @@
 #include "../../Lib/include/graphics.h"
 #include "../../Lib/include/keyboard.h"
+#include "../../Lib/include/mouse.h"
 
 #define MAX_COMMAND_LENGTH 256
 #define LINE_HEIGHT 10
@@ -8,6 +9,12 @@
 // Window state
 static int window_minimized = 0;
 static int window_maximized = 0;
+static int window_dragging = 0;
+static int drag_offset_x = 0;
+static int drag_offset_y = 0;
+
+// Previous mouse state for click detection
+static unsigned char prev_mouse_buttons = 0;
 
 // Normal window dimensions
 static int normal_term_x = 30;
@@ -26,6 +33,10 @@ static char command_buffer[MAX_COMMAND_LENGTH];
 static int cmd_index = 0;
 static int current_line = 0;
 static int current_wallpaper = 0;
+
+// Cursor visibility
+static int cursor_visible = 1;
+static int cursor_blink_counter = 0;
 
 // String utilities
 int strcmp(const char* s1, const char* s2) {
@@ -58,6 +69,11 @@ void strcpy(char* dest, const char* src) {
     *dest = '\0';
 }
 
+// Check if point is inside rectangle
+int point_in_rect(int px, int py, int rx, int ry, int rw, int rh) {
+    return px >= rx && px < rx + rw && py >= ry && py < ry + rh;
+}
+
 // Draw current wallpaper
 void draw_wallpaper() {
     switch (current_wallpaper) {
@@ -81,27 +97,44 @@ void draw_wallpaper() {
     }
 }
 
+// Draw mouse cursor
+void draw_mouse_cursor(int x, int y) {
+    // Draw arrow cursor
+    unsigned int cursor_color = COLOR_WHITE;
+    unsigned int outline_color = RGB(0, 0, 0);
+    
+    // Outline
+    for (int i = 0; i < 12; i++) {
+        graphics_put_pixel(x, y + i, outline_color);
+        graphics_put_pixel(x + i/2, y + i, outline_color);
+    }
+    graphics_draw_line(x, y + 11, x + 6, y + 6, outline_color);
+    
+    // Fill
+    for (int i = 1; i < 11; i++) {
+        for (int j = 1; j < i/2; j++) {
+            graphics_put_pixel(x + j, y + i, cursor_color);
+        }
+    }
+}
+
 // Draw minimize icon
 void draw_minimize_icon(int x, int y) {
-    // Horizontal line
     graphics_draw_line(x - 3, y, x + 3, y, RGB(40, 40, 40));
 }
 
 // Draw maximize icon
 void draw_maximize_icon(int x, int y) {
     if (window_maximized) {
-        // Two overlapping squares (restore icon)
         graphics_draw_rect(x - 3, y - 2, 5, 5, RGB(40, 40, 40));
         graphics_draw_rect(x - 1, y - 4, 5, 5, RGB(40, 40, 40));
     } else {
-        // Single square (maximize icon)
         graphics_draw_rect(x - 3, y - 3, 7, 7, RGB(40, 40, 40));
     }
 }
 
 // Draw close icon
 void draw_close_icon(int x, int y) {
-    // X shape
     graphics_draw_line(x - 3, y - 3, x + 3, y + 3, RGB(40, 40, 40));
     graphics_draw_line(x - 3, y + 3, x + 3, y - 3, RGB(40, 40, 40));
 }
@@ -111,7 +144,6 @@ void draw_terminal_window() {
     int width = graphics_get_width();
     int height = graphics_get_height();
     
-    // Update dimensions based on state
     if (window_maximized) {
         term_x = 0;
         term_y = 0;
@@ -124,21 +156,18 @@ void draw_terminal_window() {
         term_height = normal_term_height;
     }
     
-    // Window shadow (if not maximized)
     if (!window_maximized) {
         graphics_fill_rect(term_x + 5, term_y + 5, term_width, term_height, RGB(0, 0, 0));
     }
     
-    // Window background - dark gray
     graphics_fill_rect(term_x, term_y, term_width, term_height, RGB(20, 20, 20));
     
-    // Window border - light gray (if not maximized)
     if (!window_maximized) {
         graphics_draw_rect(term_x, term_y, term_width, term_height, RGB(120, 120, 120));
         graphics_draw_rect(term_x + 1, term_y + 1, term_width - 2, term_height - 2, RGB(100, 100, 100));
     }
     
-    // Title bar with gradient
+    // Title bar
     for (int i = 0; i < 20; i++) {
         unsigned char gray = 80 - i * 2;
         graphics_fill_rect(term_x + 2, term_y + 2 + i, term_width - 4, 1, RGB(gray, gray, gray));
@@ -146,20 +175,19 @@ void draw_terminal_window() {
     
     graphics_draw_string(term_x + 10, term_y + 7, "SEPPUKU OS Terminal v1.3", COLOR_WHITE);
     
-    // Window control buttons with hover effects
     int btn_y = term_y + 12;
     
-    // Close button (red when hovered)
+    // Close button
     graphics_fill_circle(term_x + term_width - 20, btn_y, 6, RGB(200, 200, 200));
     graphics_fill_circle(term_x + term_width - 20, btn_y, 5, RGB(255, 95, 86));
     draw_close_icon(term_x + term_width - 20, btn_y);
     
-    // Maximize button (green when hovered)
+    // Maximize button
     graphics_fill_circle(term_x + term_width - 40, btn_y, 6, RGB(150, 150, 150));
     graphics_fill_circle(term_x + term_width - 40, btn_y, 5, RGB(40, 201, 64));
     draw_maximize_icon(term_x + term_width - 40, btn_y);
     
-    // Minimize button (yellow when hovered)
+    // Minimize button
     graphics_fill_circle(term_x + term_width - 60, btn_y, 6, RGB(100, 100, 100));
     graphics_fill_circle(term_x + term_width - 60, btn_y, 5, RGB(255, 189, 46));
     draw_minimize_icon(term_x + term_width - 60, btn_y);
@@ -170,31 +198,24 @@ void draw_minimized_taskbar() {
     int width = graphics_get_width();
     int height = graphics_get_height();
     
-    // Taskbar at bottom
     int taskbar_height = 40;
     graphics_fill_rect(0, height - taskbar_height, width, taskbar_height, RGB(40, 40, 40));
     graphics_draw_line(0, height - taskbar_height, width, height - taskbar_height, RGB(100, 100, 100));
     
-    // Terminal icon/button
     int btn_x = 20;
     int btn_y = height - taskbar_height + 5;
     int btn_w = 150;
     int btn_h = 30;
     
-    // Button background
     graphics_fill_rect(btn_x, btn_y, btn_w, btn_h, RGB(60, 60, 60));
     graphics_draw_rect(btn_x, btn_y, btn_w, btn_h, RGB(100, 100, 100));
     
-    // Terminal icon (small square)
     graphics_fill_rect(btn_x + 5, btn_y + 7, 16, 16, RGB(20, 20, 20));
     graphics_draw_rect(btn_x + 5, btn_y + 7, 16, 16, RGB(150, 150, 150));
     graphics_draw_string(btn_x + 8, btn_y + 10, ">_", COLOR_WHITE);
     
-    // Text
     graphics_draw_string(btn_x + 25, btn_y + 10, "Terminal", COLOR_WHITE);
-    
-    // Click hint
-    graphics_draw_string(width - 200, height - taskbar_height + 12, "Press Space to restore", RGB(180, 180, 180));
+    graphics_draw_string(width - 200, height - taskbar_height + 12, "Click to restore", RGB(180, 180, 180));
 }
 
 // Print text
@@ -222,24 +243,19 @@ void redraw_prompt() {
     int start_y = term_y + 30;
     int y = start_y + current_line * LINE_HEIGHT;
     
-    // Clear prompt line
     graphics_fill_rect(start_x, y, term_width - 20, LINE_HEIGHT, RGB(20, 20, 20));
-    
-    // Draw prompt
     graphics_draw_string(start_x, y, "root@seppuku:~$ ", COLOR_LIGHT_GREEN);
-    
-    // Draw command
     graphics_draw_string(start_x + 136, y, command_buffer, COLOR_WHITE);
     
-    // Draw cursor
-    int cursor_x = start_x + 136 + (cmd_index * 8);
-    graphics_fill_rect(cursor_x, y, 8, 8, RGB(150, 150, 150));
+    if (cursor_visible) {
+        int cursor_x = start_x + 136 + (cmd_index * 8);
+        graphics_fill_rect(cursor_x, y, 8, 8, RGB(150, 150, 150));
+    }
 }
 
 // Toggle minimize
 void toggle_minimize() {
     window_minimized = !window_minimized;
-    
     draw_wallpaper();
     
     if (window_minimized) {
@@ -255,11 +271,9 @@ void toggle_maximize() {
     if (window_minimized) return;
     
     window_maximized = !window_maximized;
-    
     draw_wallpaper();
     draw_terminal_window();
     
-    // Reset line counter if maximized to use more space
     if (window_maximized) {
         current_line = 0;
     }
@@ -275,19 +289,16 @@ void shell_execute(const char* cmd) {
         return;
     }
     
-    // MINIMIZE
     if (strcmp(cmd, "minimize") == 0 || strcmp(cmd, "min") == 0) {
         toggle_minimize();
         return;
     }
     
-    // MAXIMIZE
     if (strcmp(cmd, "maximize") == 0 || strcmp(cmd, "max") == 0) {
         toggle_maximize();
         return;
     }
     
-    // HELP
     if (strcmp(cmd, "help") == 0) {
         shell_println("Available commands:", COLOR_CYAN);
         shell_println("  help       - Show this help", COLOR_WHITE);
@@ -299,10 +310,13 @@ void shell_execute(const char* cmd) {
         shell_println("  minimize   - Minimize window", COLOR_WHITE);
         shell_println("  maximize   - Maximize window", COLOR_WHITE);
         shell_println("  reboot     - Reboot system", COLOR_WHITE);
+        shell_println("", COLOR_WHITE);
+        shell_println("Mouse support enabled!", COLOR_GREEN);
+        shell_println("  - Click and drag title bar to move", COLOR_WHITE);
+        shell_println("  - Click buttons to min/max/close", COLOR_WHITE);
         return;
     }
     
-    // CLEAR
     if (strcmp(cmd, "clear") == 0) {
         draw_wallpaper();
         draw_terminal_window();
@@ -310,27 +324,24 @@ void shell_execute(const char* cmd) {
         return;
     }
     
-    // ECHO
     if (starts_with(cmd, "echo ")) {
         const char* text = cmd + 5;
         shell_println(text, COLOR_YELLOW);
         return;
     }
     
-    // ABOUT
     if (strcmp(cmd, "about") == 0) {
         shell_println("========================================", COLOR_LIGHT_CYAN);
-        shell_println("SEPPUKU OS v1.3 - Window Manager", COLOR_LIGHT_RED);
+        shell_println("SEPPUKU OS v1.3 - Mouse Edition", COLOR_LIGHT_RED);
         shell_println("========================================", COLOR_LIGHT_CYAN);
-        shell_println("A modern x86 OS with window management", COLOR_WHITE);
+        shell_println("A modern x86 OS with mouse support", COLOR_WHITE);
         shell_println("Built from scratch in C and Assembly", COLOR_YELLOW);
         shell_println("Features: Protected mode, IDT, KB,", COLOR_GRAY);
-        shell_println("          Graphics, Windows, Wallpapers", COLOR_GRAY);
+        shell_println("          Mouse, Graphics, Windows", COLOR_GRAY);
         shell_println("", COLOR_WHITE);
         return;
     }
     
-    // SYSINFO
     if (strcmp(cmd, "sysinfo") == 0) {
         shell_println("System Information:", COLOR_CYAN);
         
@@ -350,10 +361,10 @@ void shell_execute(const char* cmd) {
         shell_println("  CPU Mode: 32-bit Protected", COLOR_WHITE);
         shell_println("  Interrupts: Enabled (IDT)", COLOR_WHITE);
         shell_println("  Window Manager: Active", COLOR_GREEN);
+        shell_println("  Mouse: PS/2 Compatible", COLOR_GREEN);
         return;
     }
     
-    // WALLPAPER
     if (strcmp(cmd, "wallpaper") == 0) {
         shell_println("Wallpaper Options:", COLOR_CYAN);
         shell_println("  wallpaper gradient  - Smooth gradient", COLOR_WHITE);
@@ -398,7 +409,6 @@ void shell_execute(const char* cmd) {
         return;
     }
     
-    // REBOOT
     if (strcmp(cmd, "reboot") == 0) {
         shell_println("Rebooting system...", COLOR_YELLOW);
         
@@ -417,14 +427,91 @@ void shell_execute(const char* cmd) {
     shell_println("Unknown command. Type 'help' for available commands.", COLOR_LIGHT_RED);
 }
 
-// Handle keyboard input
-void shell_handle_key(char c) {
-    // Space key restores from minimize
-    if (c == ' ' && window_minimized) {
-        toggle_minimize();
-        return;
+// Handle mouse events
+void shell_handle_mouse() {
+    int mx = mouse_get_x();
+    int my = mouse_get_y();
+    unsigned char buttons = mouse_get_buttons();
+    
+    // Detect button clicks (button pressed and wasn't pressed before)
+    int left_click = (buttons & MOUSE_LEFT_BUTTON) && !(prev_mouse_buttons & MOUSE_LEFT_BUTTON);
+    int left_release = !(buttons & MOUSE_LEFT_BUTTON) && (prev_mouse_buttons & MOUSE_LEFT_BUTTON);
+    
+    // Handle window dragging
+    if (window_dragging) {
+        if (left_release) {
+            window_dragging = 0;
+        } else if (!window_maximized) {
+            normal_term_x = mx - drag_offset_x;
+            normal_term_y = my - drag_offset_y;
+            
+            // Keep window on screen
+            if (normal_term_x < 0) normal_term_x = 0;
+            if (normal_term_y < 0) normal_term_y = 0;
+            if (normal_term_x + normal_term_width > graphics_get_width()) {
+                normal_term_x = graphics_get_width() - normal_term_width;
+            }
+            if (normal_term_y + normal_term_height > graphics_get_height()) {
+                normal_term_y = graphics_get_height() - normal_term_height;
+            }
+            
+            draw_wallpaper();
+            draw_terminal_window();
+            redraw_prompt();
+        }
     }
     
+    if (left_click) {
+        // Check for minimized taskbar click
+        if (window_minimized) {
+            int height = graphics_get_height();
+            int taskbar_height = 40;
+            int btn_x = 20;
+            int btn_y = height - taskbar_height + 5;
+            int btn_w = 150;
+            int btn_h = 30;
+            
+            if (point_in_rect(mx, my, btn_x, btn_y, btn_w, btn_h)) {
+                toggle_minimize();
+            }
+        } else {
+            int btn_y = term_y + 12;
+            
+            // Check close button
+            int close_x = term_x + term_width - 20;
+            if (point_in_rect(mx, my, close_x - 6, btn_y - 6, 12, 12)) {
+                shell_println("", COLOR_WHITE);
+                shell_println("Thanks for using SEPPUKU OS!", COLOR_CYAN);
+                shell_println("System halted. Close QEMU to exit.", COLOR_YELLOW);
+                while(1) __asm__ __volatile__("hlt");
+            }
+            
+            // Check maximize button
+            int max_x = term_x + term_width - 40;
+            if (point_in_rect(mx, my, max_x - 6, btn_y - 6, 12, 12)) {
+                toggle_maximize();
+            }
+            
+            // Check minimize button
+            int min_x = term_x + term_width - 60;
+            if (point_in_rect(mx, my, min_x - 6, btn_y - 6, 12, 12)) {
+                toggle_minimize();
+            }
+            
+            // Check title bar for dragging
+            if (!window_maximized && point_in_rect(mx, my, term_x, term_y, term_width, 24)) {
+                window_dragging = 1;
+                drag_offset_x = mx - term_x;
+                drag_offset_y = my - term_y;
+            }
+        }
+    }
+    
+    prev_mouse_buttons = buttons;
+}
+
+// Handle keyboard input
+void shell_handle_key(char c) {
     if (window_minimized) return;
     
     if (c == '\n') {
@@ -453,8 +540,8 @@ void shell_init() {
     current_wallpaper = 3;
     window_minimized = 0;
     window_maximized = 0;
+    window_dragging = 0;
     
-    // Set normal window size
     int width = graphics_get_width();
     int height = graphics_get_height();
     normal_term_width = width - 60;
@@ -467,13 +554,13 @@ void shell_init() {
     draw_terminal_window();
     
     shell_println("", COLOR_WHITE);
-    shell_println("Welcome to SEPPUKU OS - Window Manager Edition!", COLOR_LIGHT_CYAN);
+    shell_println("Welcome to SEPPUKU OS - Mouse Edition!", COLOR_LIGHT_CYAN);
     shell_println("Type 'help' for available commands.", COLOR_LIGHT_GRAY);
     shell_println("", COLOR_WHITE);
-    shell_println("Window controls:", COLOR_CYAN);
-    shell_println("  - Type 'minimize' or press the yellow button", COLOR_WHITE);
-    shell_println("  - Type 'maximize' or press the green button", COLOR_WHITE);
-    shell_println("  - Press Space to restore from minimize", COLOR_WHITE);
+    shell_println("Mouse features:", COLOR_CYAN);
+    shell_println("  - Click and drag title bar to move window", COLOR_WHITE);
+    shell_println("  - Click colored buttons to control window", COLOR_WHITE);
+    shell_println("  - Yellow: minimize, Green: maximize, Red: close", COLOR_WHITE);
     shell_println("", COLOR_WHITE);
     
     redraw_prompt();
@@ -483,11 +570,46 @@ void shell_init() {
 void shell_run() {
     shell_init();
     
+    int frame_counter = 0;
+    
     while (1) {
+        // Handle keyboard
         if (keyboard_available()) {
             char c = keyboard_getchar();
             shell_handle_key(c);
         }
+        
+        // Handle mouse
+        shell_handle_mouse();
+        
+        // Redraw screen periodically
+        frame_counter++;
+        if (frame_counter >= 5000) {
+            frame_counter = 0;
+            
+            // Update cursor blink
+            cursor_blink_counter++;
+            if (cursor_blink_counter >= 30) {
+                cursor_blink_counter = 0;
+                cursor_visible = !cursor_visible;
+                if (!window_minimized) {
+                    redraw_prompt();
+                }
+            }
+            
+            // Redraw everything
+            draw_wallpaper();
+            if (window_minimized) {
+                draw_minimized_taskbar();
+            } else {
+                draw_terminal_window();
+                redraw_prompt();
+            }
+            
+            // Draw mouse cursor on top
+            draw_mouse_cursor(mouse_get_x(), mouse_get_y());
+        }
+        
         __asm__ __volatile__("hlt");
     }
 }

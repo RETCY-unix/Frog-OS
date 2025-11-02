@@ -23,9 +23,9 @@ static void pic_remap() {
     __asm__ __volatile__("outb %0, %1" : : "a"((unsigned char)0x01), "Nd"((unsigned short)0x21));
     __asm__ __volatile__("outb %0, %1" : : "a"((unsigned char)0x01), "Nd"((unsigned short)0xA1));
     
-    // Mask all interrupts except keyboard (IRQ1)
+    // Mask all interrupts except keyboard (IRQ1) and mouse (IRQ12)
     __asm__ __volatile__("outb %0, %1" : : "a"((unsigned char)0xFD), "Nd"((unsigned short)0x21));
-    __asm__ __volatile__("outb %0, %1" : : "a"((unsigned char)0xFF), "Nd"((unsigned short)0xA1));
+    __asm__ __volatile__("outb %0, %1" : : "a"((unsigned char)0xEF), "Nd"((unsigned short)0xA1));
 }
 
 // Set an IDT gate
@@ -100,7 +100,7 @@ void idt_init() {
     idt_set_gate(41, (unsigned int)irq_9, 0x08, 0x8E);
     idt_set_gate(42, (unsigned int)irq_10, 0x08, 0x8E);
     idt_set_gate(43, (unsigned int)irq_11, 0x08, 0x8E);
-    idt_set_gate(44, (unsigned int)irq_12, 0x08, 0x8E);
+    idt_set_gate(44, (unsigned int)irq_12, 0x08, 0x8E); // Mouse
     idt_set_gate(45, (unsigned int)irq_13, 0x08, 0x8E);
     idt_set_gate(46, (unsigned int)irq_14, 0x08, 0x8E);
     idt_set_gate(47, (unsigned int)irq_15, 0x08, 0x8E);

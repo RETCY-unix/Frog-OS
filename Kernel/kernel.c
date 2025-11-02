@@ -1,6 +1,7 @@
 #include "../Lib/include/graphics.h"
 #include "../Lib/include/idt.h"
 #include "../Lib/include/keyboard.h"
+#include "../Lib/include/mouse.h"
 #include "../user/shell/shell.h"
 
 void kernel_main() {
@@ -20,7 +21,7 @@ void kernel_main() {
     }
     
     // Draw title
-    graphics_draw_string(cx - 120, cy + 70, "SEPPUKU OS v1.2", COLOR_WHITE);
+    graphics_draw_string(cx - 120, cy + 70, "SEPPUKU OS v1.3", COLOR_WHITE);
     graphics_draw_string(cx - 80, cy + 85, "Graphics Edition", COLOR_LIGHT_CYAN);
     
     // Boot messages
@@ -62,6 +63,15 @@ void kernel_main() {
     
     keyboard_init();
     graphics_draw_string(292, y, " OK", COLOR_GREEN);
+    y += 12;
+    
+    graphics_draw_string(100, y, "[...] Initializing mouse...", COLOR_YELLOW);
+    
+    // Small delay
+    for (volatile int i = 0; i < 1000000; i++);
+    
+    mouse_init();
+    graphics_draw_string(276, y, " OK", COLOR_GREEN);
     y += 12;
     
     graphics_draw_string(100, y, "[...] Starting shell...", COLOR_YELLOW);
