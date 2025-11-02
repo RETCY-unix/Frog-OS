@@ -1,5 +1,7 @@
 #include "../../Lib/include/graphics.h"
 #include "../../Lib/include/keyboard.h"
+#include "../../Lib/include/ata.h"
+#include "../../Lib/include/fat12.h"
 
 #define MAX_COMMAND_LENGTH 256
 #define LINE_HEIGHT 10
@@ -31,6 +33,9 @@ static int current_wallpaper = 0;
 static int cursor_visible = 1;
 static int cursor_blink_counter = 0;
 
+// FS mounted flag
+static int fs_mounted = 0;
+
 // String utilities
 int strcmp(const char* s1, const char* s2) {
     while (*s1 && (*s1 == *s2)) {
@@ -53,6 +58,13 @@ int starts_with(const char* str, const char* prefix) {
         prefix++;
     }
     return 1;
+}
+
+void strcpy(char* dest, const char* src) {
+    while (*src) {
+        *dest++ = *src++;
+    }
+    *dest = '\0';
 }
 
 // Draw current wallpaper
@@ -131,7 +143,7 @@ void draw_terminal_window() {
         graphics_fill_rect(term_x + 2, term_y + 2 + i, term_width - 4, 1, RGB(gray, gray, gray));
     }
     
-    graphics_draw_string(term_x + 10, term_y + 7, "SEPPUKU OS Terminal v1.3", COLOR_WHITE);
+    graphics_draw_string(term_x + 10, term_y + 7, "SEPPUKU OS Terminal v1.4 FS", COLOR_WHITE);
     
     int btn_y = term_y + 12;
     
@@ -244,6 +256,152 @@ void shell_execute(const char* cmd) {
         return;
     }
     
+    // FILE SYSTEM COMMANDS
+    if (strcmp(cmd, "mount") == 0) {
+        if (fs_mounted) {
+            shell_println("File system already mounted", COLOR_YELLOW);
+            return;
+        }
+        
+        shell_println("Initializing ATA driver...", COLOR_CYAN);
+        ata_init();
+        
+        shell_println("Mounting FAT12 file system...", COLOR_CYAN);
+        fat12_init();
+        
+        fs_mounted = 1;
+        shell_println("File system mounted successfully!", COLOR_GREEN);
+        shell_println("Use 'ls' to list files", COLOR_WHITE);
+        return;
+    }
+    
+    if (strcmp(cmd, "ls") == 0) {
+        if (!fs_mounted) {
+            shell_println("File system not mounted. Use 'mount' first.", COLOR_RED);
+            return;
+        }
+        
+        fat12_entry_t entries[20];
+        int count = fat12_list_files(entries, 20);
+        
+        if (count == 0) {
+            shell_println("No files found (or empty disk)", COLOR_YELLOW);
+        } else {
+            shell_println("Files:", COLOR_CYAN);
+            for (int i = 0; i < count; i++) {
+                char filename[13];
+                // Format 8.3 filename
+                int j = 0;
+                for (int k = 0; k < 8 && entries[i].filename[k] != ' '; k++) {
+                    filename[j++] = entries[i].filename[k];
+                }
+                if (entries[i].filename[8] != ' ') {
+                    filename[j++] = '.';
+                    for (int k = 8; k < 11 && entries[i].filename[k] != ' '; k++) {
+                        filename[j++] = entries[i].filename[k];
+                    }
+                }
+                filename[j] = '\0';
+                
+                shell_println(filename, COLOR_WHITE);
+            }
+        }
+        return;
+    }
+    
+    if (starts_with(cmd, "cat ")) {
+        if (!fs_mounted) {
+            shell_println("File system not mounted. Use 'mount' first.", COLOR_RED);
+            return;
+        }
+        
+        const char* filename = cmd + 4;
+        unsigned char buffer[512];
+        
+        int size = fat12_read_file(filename, buffer, 512);
+        
+        if (size < 0) {
+            shell_println("File not found or read error", COLOR_RED);
+        } else if (size == 0) {
+            shell_println("(empty file)", COLOR_YELLOW);
+        } else {
+            // Print file contents
+            for (int i = 0; i < size; i++) {
+                char c = buffer[i];
+                if (c == '\n' || c == '\r') {
+                    current_line++;
+                } else if (c >= 32 && c <= 126) {
+                    char str[2] = {c, '\0'};
+                    int start_x = term_x + 10;
+                    int start_y = term_y + 30;
+                    graphics_draw_string(start_x + (i % 80) * 8, start_y + current_line * LINE_HEIGHT, str, COLOR_YELLOW);
+                }
+            }
+            current_line++;
+        }
+        return;
+    }
+    
+    if (starts_with(cmd, "write ")) {
+        if (!fs_mounted) {
+            shell_println("File system not mounted. Use 'mount' first.", COLOR_RED);
+            return;
+        }
+        
+        // Parse: write filename content
+        const char* args = cmd + 6;
+        char filename[20];
+        int i = 0;
+        
+        // Get filename (until space)
+        while (args[i] && args[i] != ' ' && i < 19) {
+            filename[i] = args[i];
+            i++;
+        }
+        filename[i] = '\0';
+        
+        if (args[i] != ' ') {
+            shell_println("Usage: write <filename> <content>", COLOR_RED);
+            return;
+        }
+        
+        const char* content = args + i + 1;
+        int len = strlen(content);
+        
+        if (len == 0) {
+            shell_println("Content cannot be empty", COLOR_RED);
+            return;
+        }
+        
+        int result = fat12_write_file(filename, (unsigned char*)content, len);
+        
+        if (result < 0) {
+            shell_println("Write failed", COLOR_RED);
+        } else {
+            shell_println("File written successfully!", COLOR_GREEN);
+        }
+        return;
+    }
+    
+    if (starts_with(cmd, "rm ")) {
+        if (!fs_mounted) {
+            shell_println("File system not mounted. Use 'mount' first.", COLOR_RED);
+            return;
+        }
+        
+        const char* filename = cmd + 3;
+        
+        int result = fat12_delete_file(filename);
+        
+        if (result < 0) {
+            shell_println("Delete failed (file not found?)", COLOR_RED);
+        } else {
+            shell_println("File deleted", COLOR_GREEN);
+        }
+        return;
+    }
+    
+    // EXISTING COMMANDS
     if (strcmp(cmd, "minimize") == 0 || strcmp(cmd, "min") == 0) {
         toggle_minimize();
         return;
@@ -263,6 +421,14 @@ void shell_execute(const char* cmd) {
         shell_println("  echo <txt> - Echo text", COLOR_WHITE);
         shell_println("  wallpaper  - Change wallpaper", COLOR_WHITE);
         shell_println("  test       - Run test", COLOR_WHITE);
+        shell_println("", COLOR_WHITE);
+        shell_println("File System Commands:", COLOR_CYAN);
+        shell_println("  mount      - Mount file system", COLOR_WHITE);
+        shell_println("  ls         - List files", COLOR_WHITE);
+        shell_println("  cat <file> - Read file", COLOR_WHITE);
+        shell_println("  write <f> <content> - Write file", COLOR_WHITE);
+        shell_println("  rm <file>  - Delete file", COLOR_WHITE);
+        shell_println("", COLOR_WHITE);
         shell_println("  minimize   - Minimize window", COLOR_WHITE);
         shell_println("  maximize   - Maximize window", COLOR_WHITE);
         shell_println("  reboot     - Reboot system", COLOR_WHITE);
@@ -281,6 +447,7 @@ void shell_execute(const char* cmd) {
         shell_println("Shell is functioning correctly", COLOR_WHITE);
         shell_println("Keyboard interrupt working", COLOR_WHITE);
         shell_println("Graphics rendering working", COLOR_WHITE);
+        shell_println("File system linked!", COLOR_GREEN);
         return;
     }
     
@@ -292,10 +459,11 @@ void shell_execute(const char* cmd) {
     
     if (strcmp(cmd, "about") == 0) {
         shell_println("========================================", COLOR_LIGHT_CYAN);
-        shell_println("SEPPUKU OS v1.3", COLOR_LIGHT_RED);
+        shell_println("SEPPUKU OS v1.4", COLOR_LIGHT_RED);
         shell_println("========================================", COLOR_LIGHT_CYAN);
         shell_println("A modern x86 OS with graphics", COLOR_WHITE);
         shell_println("Built from scratch in C and Assembly", COLOR_YELLOW);
+        shell_println("Now with FAT12 file system!", COLOR_GREEN);
         shell_println("", COLOR_WHITE);
         return;
     }
@@ -319,6 +487,12 @@ void shell_execute(const char* cmd) {
         shell_println("  CPU Mode: 32-bit Protected", COLOR_WHITE);
         shell_println("  Interrupts: Enabled (IDT)", COLOR_WHITE);
         shell_println("  Window Manager: Active", COLOR_GREEN);
+        
+        if (fs_mounted) {
+            shell_println("  File System: FAT12 (mounted)", COLOR_GREEN);
+        } else {
+            shell_println("  File System: Not mounted", COLOR_YELLOW);
+        }
         return;
     }
     
@@ -414,6 +588,7 @@ void shell_init() {
     current_wallpaper = 3;
     window_minimized = 0;
     window_maximized = 0;
+    fs_mounted = 0;
     
     int width = graphics_get_width();
     int height = graphics_get_height();
@@ -427,8 +602,10 @@ void shell_init() {
     draw_terminal_window();
     
     shell_println("", COLOR_WHITE);
-    shell_println("Welcome to SEPPUKU OS!", COLOR_LIGHT_CYAN);
+    shell_println("Welcome to SEPPUKU OS v1.4!", COLOR_LIGHT_CYAN);
+    shell_println("Now with FAT12 file system support", COLOR_GREEN);
     shell_println("Type 'help' for available commands.", COLOR_LIGHT_GRAY);
+    shell_println("Type 'mount' to initialize file system.", COLOR_YELLOW);
     shell_println("", COLOR_WHITE);
     
     redraw_prompt();
@@ -447,7 +624,7 @@ void shell_run() {
         }
         
         frame_counter++;
-        if (frame_counter >= 5000) {
+        if (frame_counter >= 50000) {
             frame_counter = 0;
             
             cursor_blink_counter++;

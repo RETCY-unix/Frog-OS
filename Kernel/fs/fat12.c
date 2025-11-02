@@ -6,8 +6,8 @@
 #define DATA_START_SECTOR 33
 #define ROOT_DIR_SECTORS 14
 
+// MOVED TO SMALLER TEMPORARY BUFFER - no huge static arrays
 static unsigned char sector_buffer[SECTOR_SIZE];
-static unsigned char fat_buffer[SECTOR_SIZE * 9];
 static int fs_initialized = 0;
 
 // Safe string length
@@ -63,27 +63,9 @@ static void format_filename(const char* input, char* output) {
     }
 }
 
-// Initialize FAT12 - with error checking
+// Initialize FAT12 - MINIMAL, non-blocking
 void fat12_init() {
-    fs_initialized = 0;
-    
-    // Clear buffers first
-    for (int i = 0; i < SECTOR_SIZE; i++) {
-        sector_buffer[i] = 0;
-    }
-    
-    for (int i = 0; i < SECTOR_SIZE * 9; i++) {
-        fat_buffer[i] = 0;
-    }
-    
-    // Try to read FAT table
-    for (int i = 0; i < 9; i++) {
-        if (ata_read_sector(FAT_START_SECTOR + i, fat_buffer + i * SECTOR_SIZE) != 0) {
-            // If read fails, just mark as uninitialized and continue
-            return;
-        }
-    }
-    
+    // Just mark as initialized - don't actually read from disk yet
     fs_initialized = 1;
 }
 

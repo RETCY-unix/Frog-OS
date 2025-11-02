@@ -1,4 +1,3 @@
-
 #include "../Lib/include/graphics.h"
 #include "../Lib/include/idt.h"
 #include "../Lib/include/keyboard.h"
@@ -11,6 +10,10 @@ void kernel_main() {
 
     // Clear screen
     graphics_clear(RGB(0, 0, 0));
+
+    // DEBUG: Show we got here
+    graphics_draw_string(100, 50, "DEBUG: Kernel started", COLOR_WHITE);
+    for (volatile int i = 0; i < 10000000; i++);
 
     // Draw boot logo
     int cx = graphics_get_width() / 2;
@@ -49,24 +52,33 @@ void kernel_main() {
     y += 12;
 
     graphics_draw_string(100, y, "[...] Initializing IDT...", COLOR_YELLOW);
-
-    // Small delay
     for (volatile int i = 0; i < 1000000; i++);
 
+    graphics_draw_string(100, 400, "DEBUG: Before IDT init", COLOR_RED);
+    for (volatile int i = 0; i < 10000000; i++);
+
     idt_init();
+    
+    graphics_draw_string(100, 420, "DEBUG: After IDT init", COLOR_RED);
+    for (volatile int i = 0; i < 10000000; i++);
+
     graphics_draw_string(260, y, " OK", COLOR_GREEN);
     y += 12;
 
     graphics_draw_string(100, y, "[...] Initializing keyboard...", COLOR_YELLOW);
-
-    // Small delay
     for (volatile int i = 0; i < 1000000; i++);
 
+    graphics_draw_string(100, 440, "DEBUG: Before keyboard init", COLOR_RED);
+    for (volatile int i = 0; i < 10000000; i++);
+
     keyboard_init();
+    
+    graphics_draw_string(100, 460, "DEBUG: After keyboard init", COLOR_RED);
+    for (volatile int i = 0; i < 10000000; i++);
+
     graphics_draw_string(292, y, " OK", COLOR_GREEN);
     y += 12;
 
-    // Don't initialize ATA here - let shell do it safely
     graphics_draw_string(100, y, "[OK] ATA driver loaded", COLOR_GREEN);
     y += 12;
 
@@ -77,9 +89,11 @@ void kernel_main() {
     y += 20;
     graphics_draw_string(100, y, ">>> BOOT SUCCESSFUL <<<", COLOR_LIGHT_GREEN);
 
-    // Wait before starting shell
-    for (volatile int i = 0; i < 50000000; i++);
+    graphics_draw_string(100, 480, "DEBUG: Before shell_run", COLOR_RED);
+    for (volatile int i = 0; i < 10000000; i++);
 
     // Start graphical shell
     shell_run();
+    
+    graphics_draw_string(100, 500, "DEBUG: After shell_run (SHOULDN'T SEE THIS)", COLOR_RED);
 }

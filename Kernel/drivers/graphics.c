@@ -37,7 +37,7 @@ static const unsigned char font8x8[95][8] = {
     {0x1E, 0x33, 0x33, 0x3E, 0x30, 0x18, 0x0E, 0x00}, // 9
     {0x00, 0x0C, 0x0C, 0x00, 0x00, 0x0C, 0x0C, 0x00}, // :
     {0x00, 0x0C, 0x0C, 0x00, 0x00, 0x0C, 0x0C, 0x06}, // ;
-    {0x18, 0x0C, 0x06, 0x03, 0x06, 0x0C, 0x18, 0x00}, // <
+    {0x18, 0x0C, 0x06, 0x03, 0x06, 0x0C, 0x18, 0x00}, // 
     {0x00, 0x00, 0x3F, 0x00, 0x00, 0x3F, 0x00, 0x00}, // =
     {0x06, 0x0C, 0x18, 0x30, 0x18, 0x0C, 0x06, 0x00}, // >
     {0x1E, 0x33, 0x30, 0x18, 0x0C, 0x00, 0x0C, 0x00}, // ?
@@ -290,7 +290,7 @@ void graphics_draw_string(int x, int y, const char* str, unsigned int color) {
 void graphics_draw_gradient_wallpaper() {
     for (int y = 0; y < screen_height; y++) {
         float t = (float)y / screen_height;
-        unsigned char gray = (unsigned char)(20 + t * 100); // Gradient from dark to light gray
+        unsigned char gray = (unsigned char)(20 + t * 100);
         unsigned int color = RGB(gray, gray, gray);
         
         for (int x = 0; x < screen_width; x++) {
@@ -298,11 +298,11 @@ void graphics_draw_gradient_wallpaper() {
         }
     }
 }
+
 // Draw abstract wallpaper with circles
 void graphics_draw_abstract_wallpaper() {
     graphics_draw_gradient_wallpaper();
     
-    // Change all circle colors to grayscale
     int circles[][4] = {
         {100, 100, 60, RGB(60, 60, 60)},
         {screen_width - 120, 80, 80, RGB(80, 80, 80)},
@@ -314,14 +314,12 @@ void graphics_draw_abstract_wallpaper() {
         {screen_width * 3 / 4, screen_height / 3, 85, RGB(65, 65, 65)}
     };
     
-    // Draw semi-transparent circles (multiple passes for alpha effect)
     for (int i = 0; i < 8; i++) {
         int cx = circles[i][0];
         int cy = circles[i][1];
         int r = circles[i][2];
         unsigned int color = circles[i][3];
         
-        // Draw multiple concentric circles for glow effect
         for (int j = 0; j < 3; j++) {
             graphics_draw_circle(cx, cy, r - j * 2, color);
         }
@@ -340,34 +338,15 @@ void graphics_draw_wave_wallpaper() {
         }
     }
 }
-// Draw modern geometric wallpaper
+
+// Draw modern geometric wallpaper - FIXED: Draw background ONLY
 void graphics_draw_geometric_wallpaper() {
-    graphics_clear(RGB(15, 15, 15)); // Dark gray base
-    
-    // Draw diagonal stripes
-    for (int i = 0; i < screen_width + screen_height; i += 80) {
-        for (int t = 0; t < 40; t++) {
-            int x1 = i - screen_height + t;
-            int y1 = 0;
-            int x2 = i + t;
-            int y2 = screen_height;
-            
-            if (x1 >= 0 && x1 < screen_width) {
-                graphics_draw_line(x1, y1, x2 < screen_width ? x2 : screen_width, 
-                                 y2, RGB(40, 40, 40));
-            }
-        }
-    }
-    
-    graphics_fill_circle(screen_width / 4, screen_height / 4, 100, RGB(60, 60, 60));
-    graphics_fill_circle(screen_width * 3 / 4, screen_height * 3 / 4, 120, RGB(70, 70, 70));
-    graphics_draw_circle(screen_width / 2, screen_height / 2, 150, RGB(100, 100, 100));
-    graphics_draw_circle(screen_width / 2, screen_height / 2, 155, RGB(100, 100, 100));
-    graphics_draw_circle(screen_width / 2, screen_height / 2, 160, RGB(100, 100, 100));
+    // Just draw a simple dark background - don't cover the whole screen with stripes!
+    graphics_clear(RGB(15, 15, 15));
 }
+
 // Aurora/Northern Lights effect
 void graphics_draw_aurora_wallpaper() {
-    // Dark sky background
     for (int y = 0; y < screen_height; y++) {
         float t = (float)y / screen_height;
         unsigned char gray = (unsigned char)(10 + t * 30);
@@ -377,7 +356,6 @@ void graphics_draw_aurora_wallpaper() {
         }
     }
     
-    // Aurora waves in grayscale
     for (int y = screen_height / 3; y < screen_height * 2 / 3; y++) {
         for (int x = 0; x < screen_width; x++) {
             int wave = ((x / 10) % 40) - 20;
@@ -397,7 +375,6 @@ void graphics_draw_aurora_wallpaper() {
         }
     }
     
-    // White stars
     for (int i = 0; i < 200; i++) {
         int x = (i * 97 + 13) % screen_width;
         int y = (i * 73 + 29) % (screen_height / 2);
