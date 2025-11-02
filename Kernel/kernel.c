@@ -1,7 +1,7 @@
 #include "../Lib/include/graphics.h"
 #include "../Lib/include/idt.h"
 #include "../Lib/include/keyboard.h"
-#include "../Lib/include/mouse.h"
+// #include "../Lib/include/mouse.h"
 #include "../user/shell/shell.h"
 
 void kernel_main() {
@@ -65,12 +65,12 @@ void kernel_main() {
     graphics_draw_string(292, y, " OK", COLOR_GREEN);
     y += 12;
     
-    graphics_draw_string(100, y, "[...] Initializing mouse...", COLOR_YELLOW);
+    //graphics_draw_string(100, y, "[...] Initializing mouse...", COLOR_YELLOW);
     
     // Small delay
     for (volatile int i = 0; i < 1000000; i++);
     
-    mouse_init();
+   // mouse_init();
     graphics_draw_string(276, y, " OK", COLOR_GREEN);
     y += 12;
     
