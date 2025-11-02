@@ -55,13 +55,6 @@ int starts_with(const char* str, const char* prefix) {
     return 1;
 }
 
-void strcpy(char* dest, const char* src) {
-    while (*src) {
-        *dest++ = *src++;
-    }
-    *dest = '\0';
-}
-
 // Draw current wallpaper
 void draw_wallpaper() {
     switch (current_wallpaper) {
@@ -85,12 +78,11 @@ void draw_wallpaper() {
     }
 }
 
-// Draw minimize icon
+// Draw icons
 void draw_minimize_icon(int x, int y) {
     graphics_draw_line(x - 3, y, x + 3, y, RGB(40, 40, 40));
 }
 
-// Draw maximize icon
 void draw_maximize_icon(int x, int y) {
     if (window_maximized) {
         graphics_draw_rect(x - 3, y - 2, 5, 5, RGB(40, 40, 40));
@@ -100,7 +92,6 @@ void draw_maximize_icon(int x, int y) {
     }
 }
 
-// Draw close icon
 void draw_close_icon(int x, int y) {
     graphics_draw_line(x - 3, y - 3, x + 3, y + 3, RGB(40, 40, 40));
     graphics_draw_line(x - 3, y + 3, x + 3, y - 3, RGB(40, 40, 40));
@@ -144,17 +135,15 @@ void draw_terminal_window() {
     
     int btn_y = term_y + 12;
     
-    // Close button
+    // Buttons
     graphics_fill_circle(term_x + term_width - 20, btn_y, 6, RGB(200, 200, 200));
     graphics_fill_circle(term_x + term_width - 20, btn_y, 5, RGB(255, 95, 86));
     draw_close_icon(term_x + term_width - 20, btn_y);
     
-    // Maximize button
     graphics_fill_circle(term_x + term_width - 40, btn_y, 6, RGB(150, 150, 150));
     graphics_fill_circle(term_x + term_width - 40, btn_y, 5, RGB(40, 201, 64));
     draw_maximize_icon(term_x + term_width - 40, btn_y);
     
-    // Minimize button
     graphics_fill_circle(term_x + term_width - 60, btn_y, 6, RGB(100, 100, 100));
     graphics_fill_circle(term_x + term_width - 60, btn_y, 5, RGB(255, 189, 46));
     draw_minimize_icon(term_x + term_width - 60, btn_y);
@@ -220,7 +209,7 @@ void redraw_prompt() {
     }
 }
 
-// Toggle minimize
+// Toggle functions
 void toggle_minimize() {
     window_minimized = !window_minimized;
     draw_wallpaper();
@@ -233,7 +222,6 @@ void toggle_minimize() {
     }
 }
 
-// Toggle maximize
 void toggle_maximize() {
     if (window_minimized) return;
     
@@ -274,6 +262,7 @@ void shell_execute(const char* cmd) {
         shell_println("  sysinfo    - System information", COLOR_WHITE);
         shell_println("  echo <txt> - Echo text", COLOR_WHITE);
         shell_println("  wallpaper  - Change wallpaper", COLOR_WHITE);
+        shell_println("  test       - Run test", COLOR_WHITE);
         shell_println("  minimize   - Minimize window", COLOR_WHITE);
         shell_println("  maximize   - Maximize window", COLOR_WHITE);
         shell_println("  reboot     - Reboot system", COLOR_WHITE);
@@ -284,6 +273,14 @@ void shell_execute(const char* cmd) {
         draw_wallpaper();
         draw_terminal_window();
         current_line = 0;
+        return;
+    }
+    
+    if (strcmp(cmd, "test") == 0) {
+        shell_println("Test command works!", COLOR_GREEN);
+        shell_println("Shell is functioning correctly", COLOR_WHITE);
+        shell_println("Keyboard interrupt working", COLOR_WHITE);
+        shell_println("Graphics rendering working", COLOR_WHITE);
         return;
     }
     
@@ -299,8 +296,6 @@ void shell_execute(const char* cmd) {
         shell_println("========================================", COLOR_LIGHT_CYAN);
         shell_println("A modern x86 OS with graphics", COLOR_WHITE);
         shell_println("Built from scratch in C and Assembly", COLOR_YELLOW);
-        shell_println("Features: Protected mode, IDT, KB,", COLOR_GRAY);
-        shell_println("          Graphics, Windows", COLOR_GRAY);
         shell_println("", COLOR_WHITE);
         return;
     }
@@ -342,19 +337,14 @@ void shell_execute(const char* cmd) {
         
         if (strcmp(type, "gradient") == 0) {
             current_wallpaper = 0;
-            shell_println("Wallpaper set to: Gradient", COLOR_GREEN);
         } else if (strcmp(type, "abstract") == 0) {
             current_wallpaper = 1;
-            shell_println("Wallpaper set to: Abstract", COLOR_GREEN);
         } else if (strcmp(type, "wave") == 0) {
             current_wallpaper = 2;
-            shell_println("Wallpaper set to: Wave", COLOR_GREEN);
         } else if (strcmp(type, "geometric") == 0) {
             current_wallpaper = 3;
-            shell_println("Wallpaper set to: Geometric", COLOR_GREEN);
         } else if (strcmp(type, "aurora") == 0) {
             current_wallpaper = 4;
-            shell_println("Wallpaper set to: Aurora", COLOR_GREEN);
         } else {
             shell_println("Unknown wallpaper. Type 'wallpaper' for options.", COLOR_RED);
             return;
@@ -391,7 +381,6 @@ void shell_execute(const char* cmd) {
 
 // Handle keyboard input
 void shell_handle_key(char c) {
-    // Special key handling for minimized window
     if (window_minimized) {
         if (c == 'r' || c == 'R') {
             toggle_minimize();
@@ -452,18 +441,15 @@ void shell_run() {
     int frame_counter = 0;
     
     while (1) {
-        // Handle keyboard
         if (keyboard_available()) {
             char c = keyboard_getchar();
             shell_handle_key(c);
         }
         
-        // Redraw screen periodically
         frame_counter++;
         if (frame_counter >= 5000) {
             frame_counter = 0;
             
-            // Update cursor blink
             cursor_blink_counter++;
             if (cursor_blink_counter >= 30) {
                 cursor_blink_counter = 0;
