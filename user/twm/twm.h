@@ -37,7 +37,7 @@ typedef struct {
 
 // Function prototypes
 void twm_init();
-void twm_handle_key(char c);
+int twm_handle_key(char c);  // Returns 1 if TWM handled key, 0 if not
 void twm_draw();
 void twm_add_tile(int workspace, int type);
 void twm_remove_tile(int workspace, int tile_index);
@@ -46,5 +46,8 @@ void twm_focus_prev();
 void twm_switch_workspace(int workspace);
 void twm_relayout(int workspace);
 twm_state_t* twm_get_state();
+int twm_needs_redraw();
+void twm_clear_redraw_flag();
+void twm_request_redraw();
 
 #endif

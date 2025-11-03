@@ -7,21 +7,20 @@
 
 #define MAX_COMMAND_LENGTH 256
 #define LINE_HEIGHT 10
-#define MAX_LINES 100
+#define MAX_LINES 80
 
 // Terminal instance structure
 typedef struct {
     char command_buffer[MAX_COMMAND_LENGTH];
     int cmd_index;
     int current_line;
-    int scroll_offset;
     char line_buffer[MAX_LINES][256];
     int cursor_visible;
     int cursor_blink_counter;
 } terminal_t;
 
 // Multiple terminal instances (one per tile)
-static terminal_t terminals[6];
+static terminal_t terminals[MAX_TILES];
 static int current_wallpaper = 3;
 static int fs_mounted = 0;
 
@@ -56,7 +55,7 @@ void strcpy(char* dest, const char* src) {
     *dest = '\0';
 }
 
-// Draw wallpaper
+// Draw wallpaper (ONLY called when actually changing wallpaper)
 void draw_wallpaper() {
     switch (current_wallpaper) {
         case 0:
@@ -87,7 +86,7 @@ static terminal_t* get_current_terminal() {
     if (ws->tile_count == 0) return &terminals[0];
     
     int focused = ws->focused_tile;
-    if (focused < 0 || focused >= 6) focused = 0;
+    if (focused < 0 || focused >= MAX_TILES) focused = 0;
     
     return &terminals[focused];
 }
@@ -109,10 +108,10 @@ static void get_terminal_bounds(int* x, int* y, int* width, int* height) {
     if (focused < 0 || focused >= ws->tile_count) focused = 0;
     
     tile_t* tile = &ws->tiles[focused];
-    *x = tile->x + 3;
-    *y = tile->y + 3;
-    *width = tile->width - 6;
-    *height = tile->height - 6;
+    *x = tile->x + 4;
+    *y = tile->y + 4;
+    *width = tile->width - 8;
+    *height = tile->height - 8;
 }
 
 // Print text in terminal
@@ -120,46 +119,75 @@ void shell_println(const char* text, unsigned int color) {
     terminal_t* term = get_current_terminal();
     
     if (term->current_line >= MAX_LINES) {
+        // Scroll up
+        for (int i = 0; i < MAX_LINES - 1; i++) {
+            strcpy(term->line_buffer[i], term->line_buffer[i + 1]);
+        }
         term->current_line = MAX_LINES - 1;
     }
     
     // Store line in buffer
-    int i = 0;
-    while (text[i] && i < 255) {
-        term->line_buffer[term->current_line][i] = text[i];
-        i++;
-    }
-    term->line_buffer[term->current_line][i] = '\0';
-    
+    strcpy(term->line_buffer[term->current_line], text);
     term->current_line++;
 }
 
-// Redraw terminal contents
+// Redraw terminal contents (inside current tile)
 void redraw_terminal() {
     terminal_t* term = get_current_terminal();
     
     int x, y, width, height;
     get_terminal_bounds(&x, &y, &width, &height);
     
-    // Clear terminal area
-    graphics_fill_rect(x, y, width, height, RGB(20, 20, 20));
+    // Clear terminal area (don't touch borders!)
+    graphics_fill_rect(x, y, width, height, RGB(15, 15, 15));
+    
+    // Calculate visible lines
+    int visible_lines = (height - 25) / LINE_HEIGHT;
+    int start_line = term->current_line > visible_lines ? term->current_line - visible_lines : 0;
     
     // Draw stored lines
-    int line_y = y + 10;
-    for (int i = 0; i < term->current_line && i < MAX_LINES; i++) {
+    int line_y = y + 5;
+    for (int i = start_line; i < term->current_line && i < MAX_LINES; i++) {
         if (line_y + LINE_HEIGHT > y + height - 20) break;
-        graphics_draw_string(x + 10, line_y, term->line_buffer[i], COLOR_WHITE);
+        graphics_draw_string(x + 5, line_y, term->line_buffer[i], COLOR_WHITE);
         line_y += LINE_HEIGHT;
     }
     
-    // Draw prompt
-    int prompt_y = y + height - 20;
-    graphics_draw_string(x + 10, prompt_y, "root@seppuku:~$ ", COLOR_LIGHT_GREEN);
-    graphics_draw_string(x + 146, prompt_y, term->command_buffer, COLOR_WHITE);
+    // Draw prompt at bottom
+    int prompt_y = y + height - 15;
+    graphics_draw_string(x + 5, prompt_y, "root@seppuku:~$ ", COLOR_LIGHT_GREEN);
+    
+    int cmd_x = x + 5 + 136;
+    graphics_draw_string(cmd_x, prompt_y, term->command_buffer, COLOR_WHITE);
     
     // Draw cursor
     if (term->cursor_visible) {
-        int cursor_x = x + 146 + (term->cmd_index * 8);
+        int cursor_x = cmd_x + (term->cmd_index * 8);
+        graphics_fill_rect(cursor_x, prompt_y, 8, 8, RGB(150, 150, 150));
+    }
+}
+
+// FAST: Only redraw the prompt line
+void redraw_prompt_only() {
+    terminal_t* term = get_current_terminal();
+    
+    int x, y, width, height;
+    get_terminal_bounds(&x, &y, &width, &height);
+    
+    int prompt_y = y + height - 15;
+    
+    // Clear just the prompt line
+    graphics_fill_rect(x + 5, prompt_y, width - 10, 10, RGB(15, 15, 15));
+    
+    // Redraw prompt
+    graphics_draw_string(x + 5, prompt_y, "root@seppuku:~$ ", COLOR_LIGHT_GREEN);
+    
+    int cmd_x = x + 5 + 136;
+    graphics_draw_string(cmd_x, prompt_y, term->command_buffer, COLOR_WHITE);
+    
+    // Draw cursor
+    if (term->cursor_visible) {
+        int cursor_x = cmd_x + (term->cmd_index * 8);
         graphics_fill_rect(cursor_x, prompt_y, 8, 8, RGB(150, 150, 150));
     }
 }
@@ -354,27 +382,21 @@ void shell_execute(const char* cmd) {
         return;
     }
     
-    // EXISTING COMMANDS
+    // BASIC COMMANDS
     if (strcmp(cmd, "help") == 0) {
-        shell_println("Available commands:", COLOR_CYAN);
+        shell_println("SEPPUKU OS - Tiling Window Manager", COLOR_CYAN);
         shell_println("", COLOR_WHITE);
-        shell_println("Tiling WM Shortcuts:", COLOR_CYAN);
-        shell_println("  ESC+1-5    - Switch workspace", COLOR_WHITE);
-        shell_println("  ESC+Enter  - New terminal tile", COLOR_WHITE);
-        shell_println("  ESC+J/K    - Focus next/prev tile", COLOR_WHITE);
-        shell_println("  ESC+Q      - Close focused tile", COLOR_WHITE);
+        shell_println("TWM Shortcuts (ESC = Super):", COLOR_CYAN);
+        shell_println("  ESC+1-5      Switch workspace", COLOR_WHITE);
+        shell_println("  ESC+Enter    New terminal tile", COLOR_WHITE);
+        shell_println("  ESC+J/K      Focus next/prev tile", COLOR_WHITE);
+        shell_println("  ESC+H/L      Focus left/right", COLOR_WHITE);
+        shell_println("  ESC+Q        Close tile (keep 1)", COLOR_WHITE);
         shell_println("", COLOR_WHITE);
         shell_println("Commands:", COLOR_CYAN);
-        shell_println("  help       - Show this help", COLOR_WHITE);
-        shell_println("  clear      - Clear screen", COLOR_WHITE);
-        shell_println("  about      - About SEPPUKU OS", COLOR_WHITE);
-        shell_println("  sysinfo    - System information", COLOR_WHITE);
-        shell_println("  wallpaper  - Change wallpaper", COLOR_WHITE);
-        shell_println("", COLOR_WHITE);
-        shell_println("Sound:", COLOR_CYAN);
+        shell_println("  help, clear, about, sysinfo", COLOR_WHITE);
+        shell_println("  echo <msg>, wallpaper", COLOR_WHITE);
         shell_println("  beep, chime, siren", COLOR_WHITE);
-        shell_println("", COLOR_WHITE);
-        shell_println("File System:", COLOR_CYAN);
         shell_println("  mount, ls, cat, write, rm", COLOR_WHITE);
         return;
     }
@@ -387,13 +409,6 @@ void shell_execute(const char* cmd) {
         return;
     }
     
-    if (strcmp(cmd, "test") == 0) {
-        shell_println("Test command works!", COLOR_GREEN);
-        shell_println("Tiling WM active!", COLOR_WHITE);
-        sound_beep(NOTE_C5, 100);
-        return;
-    }
-    
     if (starts_with(cmd, "echo ")) {
         const char* text = cmd + 5;
         shell_println(text, COLOR_YELLOW);
@@ -402,10 +417,10 @@ void shell_execute(const char* cmd) {
     
     if (strcmp(cmd, "about") == 0) {
         shell_println("========================================", COLOR_LIGHT_CYAN);
-        shell_println("SEPPUKU OS v2.0 - TILING WM EDITION", COLOR_LIGHT_RED);
+        shell_println("SEPPUKU OS v2.0 - TWM EDITION", COLOR_LIGHT_RED);
         shell_println("========================================", COLOR_LIGHT_CYAN);
-        shell_println("Keyboard-driven tiling window manager", COLOR_WHITE);
-        shell_println("Press ESC then other keys for shortcuts", COLOR_YELLOW);
+        shell_println("i3/hyprland-style tiling window manager", COLOR_WHITE);
+        shell_println("Keyboard-driven workflow", COLOR_WHITE);
         shell_println("", COLOR_WHITE);
         sound_beep(NOTE_C4, 80);
         for (volatile int i = 0; i < 500000; i++);
@@ -421,18 +436,34 @@ void shell_execute(const char* cmd) {
         int w = graphics_get_width();
         int h = graphics_get_height();
         
-        shell_println("  Resolution: ", COLOR_WHITE);
         if (w == 1920 && h == 1080) {
-            shell_println("    1920x1080 (Full HD)", COLOR_GREEN);
+            shell_println("  Resolution: 1920x1080 (Full HD)", COLOR_GREEN);
         } else if (w == 1280 && h == 1024) {
-            shell_println("    1280x1024 (SXGA)", COLOR_GREEN);
+            shell_println("  Resolution: 1280x1024 (SXGA)", COLOR_GREEN);
         } else if (w == 1024 && h == 768) {
-            shell_println("    1024x768 (XGA)", COLOR_GREEN);
+            shell_println("  Resolution: 1024x768 (XGA)", COLOR_GREEN);
         }
         
-        shell_println("  Window Manager: Tiling (i3-style)", COLOR_GREEN);
+        twm_state_t* twm = twm_get_state();
+        workspace_t* ws = &twm->workspaces[twm->current_workspace];
+        
+        shell_println("  Window Manager: i3-style TWM", COLOR_GREEN);
+        
+        char ws_info[40];
+        ws_info[0] = ' '; ws_info[1] = ' ';
+        ws_info[2] = 'W'; ws_info[3] = 'o'; ws_info[4] = 'r'; ws_info[5] = 'k';
+        ws_info[6] = 's'; ws_info[7] = 'p'; ws_info[8] = 'a'; ws_info[9] = 'c';
+        ws_info[10] = 'e'; ws_info[11] = ':'; ws_info[12] = ' ';
+        ws_info[13] = '1' + twm->current_workspace;
+        ws_info[14] = ' '; ws_info[15] = '(';
+        ws_info[16] = '0' + ws->tile_count;
+        ws_info[17] = ' '; ws_info[18] = 't'; ws_info[19] = 'i'; ws_info[20] = 'l';
+        ws_info[21] = 'e'; ws_info[22] = 's'; ws_info[23] = ')';
+        ws_info[24] = '\0';
+        shell_println(ws_info, COLOR_WHITE);
+        
         shell_println("  Graphics: VESA VBE 2.0+", COLOR_WHITE);
-        shell_println("  Sound: PC Speaker Active", COLOR_GREEN);
+        shell_println("  Sound: PC Speaker", COLOR_GREEN);
         
         if (fs_mounted) {
             shell_println("  File System: FAT12 (mounted)", COLOR_GREEN);
@@ -444,11 +475,11 @@ void shell_execute(const char* cmd) {
     
     if (strcmp(cmd, "wallpaper") == 0) {
         shell_println("Wallpaper Options:", COLOR_CYAN);
-        shell_println("  wallpaper gradient  - Smooth gradient", COLOR_WHITE);
-        shell_println("  wallpaper abstract  - Abstract circles", COLOR_WHITE);
-        shell_println("  wallpaper wave      - Wave pattern", COLOR_WHITE);
-        shell_println("  wallpaper geometric - Modern geometric", COLOR_WHITE);
-        shell_println("  wallpaper aurora    - Aurora lights", COLOR_WHITE);
+        shell_println("  wallpaper gradient", COLOR_WHITE);
+        shell_println("  wallpaper abstract", COLOR_WHITE);
+        shell_println("  wallpaper wave", COLOR_WHITE);
+        shell_println("  wallpaper geometric", COLOR_WHITE);
+        shell_println("  wallpaper aurora", COLOR_WHITE);
         return;
     }
     
@@ -470,9 +501,9 @@ void shell_execute(const char* cmd) {
             return;
         }
         
+        // Request full redraw for wallpaper change
         draw_wallpaper();
-        twm_draw();
-        redraw_terminal();
+        twm_request_redraw();
         shell_println("Wallpaper changed!", COLOR_GREEN);
         sound_beep(BEEP_SUCCESS, 80);
         return;
@@ -502,37 +533,45 @@ void shell_execute(const char* cmd) {
 void shell_handle_key(char c) {
     terminal_t* term = get_current_terminal();
     
-    // Let TWM handle it first (for shortcuts)
-    twm_handle_key(c);
+    // Let TWM handle it first
+    int twm_handled = twm_handle_key(c);
     
-    // If it's ESC, don't process in terminal
+    // If TWM handled it (workspace switch, etc), it will request redraw
+    if (twm_handled) {
+        return;
+    }
+    
+    // Don't process ESC in terminal
     if (c == 0x1B) {
         return;
     }
     
+    // Terminal input
     if (c == '\n') {
         term->command_buffer[term->cmd_index] = '\0';
         shell_execute(term->command_buffer);
         term->cmd_index = 0;
         term->command_buffer[0] = '\0';
+        redraw_terminal(); // Full terminal redraw after command
     } else if (c == '\b') {
         if (term->cmd_index > 0) {
             term->cmd_index--;
             term->command_buffer[term->cmd_index] = '\0';
         }
-    } else if (term->cmd_index < MAX_COMMAND_LENGTH - 1) {
+        redraw_prompt_only(); // FAST: only prompt
+    } else if (term->cmd_index < MAX_COMMAND_LENGTH - 1 && c >= 32 && c <= 126) {
         term->command_buffer[term->cmd_index++] = c;
         term->command_buffer[term->cmd_index] = '\0';
+        redraw_prompt_only(); // FAST: only prompt
     }
 }
 
 // Initialize shell
 void shell_init() {
     // Initialize all terminals
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < MAX_TILES; i++) {
         terminals[i].cmd_index = 0;
         terminals[i].current_line = 0;
-        terminals[i].scroll_offset = 0;
         terminals[i].cursor_visible = 1;
         terminals[i].cursor_blink_counter = 0;
         terminals[i].command_buffer[0] = '\0';
@@ -547,18 +586,15 @@ void shell_init() {
     // Initialize TWM
     twm_init();
     
+    // Initial draw
     draw_wallpaper();
     twm_draw();
     
+    // Welcome message in first terminal
     shell_println("", COLOR_WHITE);
-    shell_println("SEPPUKU OS v2.0 - TILING WM EDITION", COLOR_LIGHT_CYAN);
+    shell_println("SEPPUKU OS v2.0 - TWM EDITION", COLOR_LIGHT_CYAN);
     shell_println("", COLOR_WHITE);
-    shell_println("Keyboard Shortcuts:", COLOR_YELLOW);
-    shell_println("  ESC+1-5    - Switch workspace", COLOR_WHITE);
-    shell_println("  ESC+Enter  - New terminal tile", COLOR_WHITE);
-    shell_println("  ESC+J/K    - Focus next/prev tile", COLOR_WHITE);
-    shell_println("  ESC+Q      - Close tile", COLOR_WHITE);
-    shell_println("", COLOR_WHITE);
+    shell_println("Press ESC then another key for shortcuts", COLOR_YELLOW);
     shell_println("Type 'help' for commands", COLOR_LIGHT_GRAY);
     shell_println("", COLOR_WHITE);
     
@@ -572,26 +608,29 @@ void shell_run() {
     int frame_counter = 0;
     
     while (1) {
+        // Handle keyboard
         if (keyboard_available()) {
             char c = keyboard_getchar();
             shell_handle_key(c);
             
-            // Redraw everything
-            draw_wallpaper();
-            twm_draw();
-            redraw_terminal();
+            // IMPORTANT: Only redraw if TWM says so
+            if (twm_needs_redraw()) {
+                twm_draw();
+                redraw_terminal();
+                twm_clear_redraw_flag();
+            }
         }
         
+        // Cursor blinking
         frame_counter++;
         if (frame_counter >= 50000) {
             frame_counter = 0;
-            
             terminal_t* term = get_current_terminal();
             term->cursor_blink_counter++;
             if (term->cursor_blink_counter >= 30) {
                 term->cursor_blink_counter = 0;
                 term->cursor_visible = !term->cursor_visible;
-                redraw_terminal();
+                redraw_prompt_only(); // FAST: only blink cursor
             }
         }
         

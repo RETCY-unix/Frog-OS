@@ -1,7 +1,6 @@
 #include "../Lib/include/graphics.h"
 #include "../Lib/include/idt.h"
 #include "../Lib/include/keyboard.h"
-#include "../Lib/include/mouse.h"
 #include "../Lib/include/sound.h"
 #include "../Lib/include/ata.h"
 #include "../user/shell/shell.h"
@@ -23,8 +22,8 @@ void kernel_main() {
     }
 
     // Draw title
-    graphics_draw_string(cx - 120, cy + 70, "SEPPUKU OS v1.5", COLOR_WHITE);
-    graphics_draw_string(cx - 100, cy + 85, "Sound Edition (Mouse WIP)", COLOR_LIGHT_CYAN);
+    graphics_draw_string(cx - 120, cy + 70, "SEPPUKU OS v2.0", COLOR_WHITE);
+    graphics_draw_string(cx - 100, cy + 85, "TWM Edition (i3-style)", COLOR_LIGHT_CYAN);
 
     // Boot messages
     int y = cy + 110;
@@ -65,10 +64,6 @@ void kernel_main() {
     graphics_draw_string(292, y, " OK", COLOR_GREEN);
     y += 12;
 
-    // SKIP MOUSE FOR NOW - it's causing hangs
-    graphics_draw_string(100, y, "[SKIP] Mouse (causes hang)", COLOR_YELLOW);
-    y += 12;
-
     graphics_draw_string(100, y, "[...] Initializing sound...", COLOR_YELLOW);
     for (volatile int i = 0; i < 1000000; i++);
 
@@ -91,6 +86,6 @@ void kernel_main() {
     sound_beep(BEEP_SUCCESS, 100);
     for (volatile int i = 0; i < 5000000; i++);
 
-    // Start graphical shell
+    // Start shell
     shell_run();
 }
